@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPLAST Factory Management - Overview</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <!-- Logo -->
+                    <div class="sidebar-logo text-center mb-4">
+                        <img src="assets/images/logo.png" alt="GPLAST" class="logo-img">
+                        <h6 class="text-white mt-2">GPLAST</h6>
+                        <small class="text-light">SARL GUERGOUR PLAST</small>
+                    </div>
+                    
+                    <!-- Navigation -->
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active text-white" href="index.html">
+                                <i class="bi bi-speedometer2 me-2"></i>
+                                Overview
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" href="khadama.html">
+                                <i class="bi bi-people me-2"></i>
+                                Khadama
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <!-- Header -->
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Overview</h1>
+                    <div class="d-flex align-items-center">
+                        <span class="text-muted me-3" id="currentDate"></span>
+                        <span class="text-muted" id="currentTime"></span>
+                    </div>
+                </div>
+
+                <!-- Dashboard Cards -->
+                <div class="row mb-4">
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-primary shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                            Total Khadama
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalWorkers">
+                                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="bi bi-people fs-2 text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-success shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                            Total Earned Payroll
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalEarnedPayroll">
+                                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="bi bi-currency-dollar fs-2 text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-info shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                            Total Advances Given
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalAdvances">
+                                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="bi bi-cash-stack fs-2 text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card border-left-warning shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                            Final Payments
+                                        </div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalFinalPayments">
+                                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="bi bi-wallet2 fs-2 text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-primary">Recent Work Sessions</h6>
+                                <a href="clock.html" class="btn btn-sm btn-primary">View All</a>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-borderless" id="recentSessionsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Worker</th>
+                                                <th>Date</th>
+                                                <th>Clock In</th>
+                                                <th>Clock Out</th>
+                                                <th>Hours</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recentSessions">
+                                            <tr>
+                                                <td colspan="5" class="text-center">
+                                                    <div class="spinner-border" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-grid gap-2">
+                                    <a href="khadama.html" class="btn btn-primary">
+                                        <i class="bi bi-person-plus me-2"></i>
+                                        Add New Worker
+                                    </a>
+                                    <a href="clock.html" class="btn btn-success">
+                                        <i class="bi bi-clock me-2"></i>
+                                        Clock In/Out
+                                    </a>
+                                    <button class="btn btn-info" onclick="refreshDashboard()">
+                                        <i class="bi bi-arrow-clockwise me-2"></i>
+                                        Refresh Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- System Status -->
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">System Status</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="status-indicator bg-success me-2"></div>
+                                    <span>Backend API: <strong id="apiStatus">Checking...</strong></span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="status-indicator bg-success me-2"></div>
+                                    <span>Database: <strong>Connected</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
