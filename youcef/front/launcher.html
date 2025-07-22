@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPLAST Factory Management - System Launcher</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .launcher-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 3rem;
+            max-width: 600px;
+            margin: 2rem auto;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .status-checking { 
+            background-color: #ffc107; 
+            animation: pulse 1.5s ease-in-out infinite alternate;
+        }
+        
+        @keyframes pulse {
+            from { opacity: 0.5; }
+            to { opacity: 1; }
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .logo-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo-section h1 {
+            color: #2c3e50;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .logo-section p {
+            color: #6c757d;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="launcher-card">
+            <!-- Logo Section -->
+            <div class="logo-section">
+                <i class="bi bi-building text-primary" style="font-size: 4rem;"></i>
+                <h1>GPLAST Factory Management</h1>
+                <p>Complete HR & Financial Management System</p>
+            </div>
+            
+            <!-- System Status -->
+            <div class="feature-card">
+                <h4><i class="bi bi-server me-2"></i>System Status</h4>
+                <div id="backend-status">
+                    <span class="status-indicator status-checking"></span>
+                    <span>Checking backend connection...</span>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">Backend URL: http://127.0.0.1:5000</small>
+                </div>
+            </div>
+            
+            <!-- Quick Access -->
+            <div class="feature-card">
+                <h4><i class="bi bi-speedometer2 me-2"></i>Quick Access</h4>
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <a href="index.html" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-house me-1"></i>Overview
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="khadama.html" class="btn btn-primary w-100">
+                            <i class="bi bi-people me-1"></i>Workers
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="groups.html" class="btn btn-outline-success w-100">
+                            <i class="bi bi-diagram-3 me-1"></i>Groups
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- New Features -->
+            <div class="feature-card">
+                <h4><i class="bi bi-star me-2 text-warning"></i>New Financial System</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-cash text-warning me-2"></i>
+                            <strong>Massarif (المصاريف)</strong>
+                        </div>
+                        <small class="text-muted">Salary advances limited to worker's monthly salary</small>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-credit-card text-danger me-2"></i>
+                            <strong>Douyoun (الديون)</strong>
+                        </div>
+                        <small class="text-muted">Loans with unlimited amounts</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Info -->
+            <div class="feature-card">
+                <h4><i class="bi bi-info-circle me-2"></i>System Information</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <small><strong>Admin PIN:</strong> 1234</small><br>
+                        <small><strong>Backend:</strong> Python Flask</small><br>
+                        <small><strong>Frontend:</strong> HTML5/Bootstrap</small>
+                    </div>
+                    <div class="col-md-6">
+                        <small><strong>Database:</strong> SQLite</small><br>
+                        <small><strong>Version:</strong> 2.0.0</small><br>
+                        <small><strong>Updated:</strong> July 22, 2025</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Instructions -->
+            <div class="alert alert-info mt-3">
+                <h6><i class="bi bi-lightbulb me-2"></i>Quick Start Instructions:</h6>
+                <ol class="mb-0">
+                    <li>Make sure the backend is running (Green status above)</li>
+                    <li>Click "Workers" to access the main HR management</li>
+                    <li>Use Admin PIN <code>1234</code> for financial operations</li>
+                    <li>Test the new Massarif and Douyoun features</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Check backend status
+        async function checkBackendStatus() {
+            const statusElement = document.getElementById('backend-status');
+            
+            try {
+                const response = await fetch('http://127.0.0.1:5000/api/test');
+                if (response.ok) {
+                    const data = await response.json();
+                    statusElement.innerHTML = `
+                        <span class="status-indicator status-online"></span>
+                        <span class="text-success">Backend Online - ${data.message}</span>
+                    `;
+                } else {
+                    throw new Error('Backend responded with error');
+                }
+            } catch (error) {
+                statusElement.innerHTML = `
+                    <span class="status-indicator status-offline"></span>
+                    <span class="text-danger">Backend Offline</span>
+                    <div class="mt-1">
+                        <small class="text-muted">Please start the backend: <code>python app.py</code></small>
+                    </div>
+                `;
+            }
+        }
+        
+        // Check status on page load
+        checkBackendStatus();
+        
+        // Recheck every 10 seconds
+        setInterval(checkBackendStatus, 10000);
+    </script>
+</body>
+</html>

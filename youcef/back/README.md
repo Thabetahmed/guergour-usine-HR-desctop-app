@@ -4,10 +4,11 @@
 ```
 back/
 ├── app.py              # Main Flask application
-├── models.py           # Database models (Worker, WorkSession, Advance)  
+├── models.py           # Database models (Group, Worker, WorkSession, Advance)  
 ├── config.py           # Configuration (database, admin PIN)
 ├── requirements.txt    # Dependencies
 ├── factory.db          # SQLite database
+├── init_db.py          # Database initialization script
 └── test_models.py      # Testing script
 ```
 
@@ -17,10 +18,19 @@ back/
 - ✅ Admin PIN protection (default: 1234)
 - ✅ Simple header-based authentication
 
-#### **Worker Management:**
-- ✅ `GET /api/workers` - List all active workers
-- ✅ `POST /api/workers` - Add new worker (requires admin PIN)
-- ✅ `PUT /api/workers/<id>` - Update worker (requires admin PIN)
+#### **🆕 Group Management:**
+- ✅ `GET /api/groups` - List all active groups
+- ✅ `POST /api/groups` - Create new group (requires admin PIN)
+- ✅ `PUT /api/groups/<id>` - Update group (requires admin PIN)
+- ✅ `DELETE /api/groups/<id>` - Delete group (requires admin PIN)
+- ✅ `GET /api/groups/<id>/workers` - Get workers in specific group
+- ✅ `POST /api/groups/<id>/add_worker` - Add worker to group (requires admin PIN)
+- ✅ `POST /api/groups/<id>/remove_worker` - Remove worker from group (requires admin PIN)
+
+#### **Enhanced Worker Management:**
+- ✅ `GET /api/workers` - List all active workers (with group info)
+- ✅ `POST /api/workers` - Add new worker with birthday & group (requires admin PIN)
+- ✅ `PUT /api/workers/<id>` - Update worker with birthday & group (requires admin PIN)
 - ✅ `DELETE /api/workers/<id>` - Deactivate worker (requires admin PIN)
 
 #### **Clock In/Out System:**
@@ -94,7 +104,7 @@ curl -X POST http://127.0.0.1:5000/api/clock-in \
 Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/clock-in" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"worker_code": "W003"}'
 ```
 
-### Add New Worker (with admin PIN):
+### Add New Worker (with admin PIN and new fields):
 
 **Using curl (Linux/Mac):**
 ```bash
@@ -107,13 +117,82 @@ curl -X POST http://127.0.0.1:5000/api/workers \
     "position": "Technician",
     "salary": 60000,
     "hire_date": "2024-07-15",
-    "phone": "0555555555"
+    "birthday": "1995-03-20",
+    "phone": "0555555555",
+    "group_id": 1
   }'
 ```
 
 **Using PowerShell (Windows):**
 ```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/workers" -Method POST -Headers @{"Content-Type"="application/json"; "X-Admin-Pin"="1234"} -Body '{"code": "W005", "name": "ahmed thabet mazouz", "position": "Technician", "salary": 60000, "hire_date": "2024-07-15", "phone": "0555555555"}'
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/workers" -Method POST -Headers @{"Content-Type"="application/json"; "X-Admin-Pin"="1234"} -Body '{"code": "W005", "name": "ahmed thabet mazouz", "position": "Technician", "salary": 60000, "hire_date": "2024-07-15", "birthday": "1990-12-10", "phone": "0555555555", "group_id": 1}'
+```
+
+## 🆕 Group Management API Examples
+
+### Get All Groups:
+
+**Using curl:**
+```bash
+curl http://127.0.0.1:5000/api/groups
+```
+
+**Using PowerShell:**
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/groups"
+```
+
+### Create New Group:
+
+**Using curl:**
+```bash
+curl -X POST http://127.0.0.1:5000/api/groups \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Pin: 1234" \
+  -d '{
+    "name": "Production Team Alpha",
+    "team_leader_id": 1
+  }'
+```
+
+**Using PowerShell:**
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/groups" -Method POST -Headers @{"Content-Type"="application/json"; "X-Admin-Pin"="1234"} -Body '{"name": "Quality Control Team", "team_leader_id": 2}'
+```
+
+### Update Group:
+
+**Using PowerShell:**
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/groups/1" -Method PUT -Headers @{"Content-Type"="application/json"; "X-Admin-Pin"="1234"} -Body '{"name": "Production Team Beta", "team_leader_id": 3}'
+```
+
+### Get Workers in Specific Group:
+
+**Using PowerShell:**
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/groups/1/workers"
+```
+
+### Add Worker to Group:
+
+**Using PowerShell:**
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/groups/1/add_worker" -Method POST -Headers @{"Content-Type"="application/json"; "X-Admin-Pin"="1234"} -Body '{"worker_id": 3}'
+```
+
+### Remove Worker from Group:
+
+**Using PowerShell:**
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/groups/1/remove_worker" -Method POST -Headers @{"Content-Type"="application/json"; "X-Admin-Pin"="1234"} -Body '{"worker_id": 3}'
+```
+
+### Delete Group:
+
+**Using PowerShell:**
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/groups/1" -Method DELETE -Headers @{"Content-Type"="application/json"; "X-Admin-Pin"="1234"}
 ```
 
 ### Get Payment Summary:
@@ -157,6 +236,19 @@ Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/advances"
 ```
 
 ## 🔧 Key Features
+
+### **🆕 Team Organization System:**
+- ✅ **Custom group names** (user-defined, not tied to team leader names)
+- ✅ **Team leader assignment** (one per group, also regular workers)
+- ✅ **Worker group membership** (each worker belongs to one group)
+- ✅ **Group-based views** and filtering capabilities
+- ✅ **Automatic status management** (team leader flags, group assignments)
+
+### **🆕 Enhanced Worker Profiles:**
+- ✅ **Birthday tracking** for each worker
+- ✅ **Group membership** display and management
+- ✅ **Team leader status** indication
+- ✅ **Extended worker information** with group context
 
 ### **Smart Clock System:**
 - ❌ **Prevents double clock-in** on same day
@@ -216,25 +308,64 @@ Final Payment: 0 DA
 Remaining Debt: 7,500 DA (15,000 - 7,500)
 ```
 
-## 🎯 Next Steps
+## � Group Management Examples
+
+### **Example 1: Production Team**
+```
+Group: Production Team Alpha
+Team Leader: Ahmed Ali (Worker ID: 1)
+Members: 5 workers
+Status: Active
+Created: 2025-07-22
+```
+
+### **Example 2: Quality Control Team**
+```
+Group: Quality Control Team
+Team Leader: Sara Mohamed (Worker ID: 3)
+Members: 3 workers
+Status: Active
+Created: 2025-07-22
+```
+
+### **Group Structure:**
+```
+📊 Factory Organization:
+├── Production Team Alpha (Leader: Ahmed Ali)
+│   ├── Worker: Youcef Ferfour
+│   ├── Worker: Mohamed Saidi
+│   └── Worker: Fatima Benaissa
+├── Quality Control Team (Leader: Sara Mohamed)
+│   ├── Worker: Karim Ouali
+│   └── Worker: Aicha Hamdi
+└── Maintenance Team (Leader: Hassan Bencheikh)
+    ├── Worker: Omar Tebboune
+    └── Worker: Nawal Zerrouki
+```
+
+## �🎯 Next Steps
 
 1. ✅ **Backend Complete** - All APIs working perfectly
-2. ✅ **Database Schema** - SQLite setup and tested
-3. ✅ **Payment Logic** - New proportional system implemented
-4. 🔄 **Frontend Development** - Electron desktop interface
-5. 🔄 **Auto-start Integration** - Flask launches with Electron
+2. ✅ **Database Schema** - SQLite setup and tested with Groups
+3. ✅ **Group Management** - Team organization system implemented
+4. ✅ **Enhanced Worker Profiles** - Birthday and group features added
+5. ✅ **Payment Logic** - New proportional system implemented
+6. 🔄 **Frontend Development** - Electron desktop interface with group management
+7. 🔄 **Auto-start Integration** - Flask launches with Electron
 
 ## 🛠️ Current Status
 
 - ✅ **Flask server running** on http://127.0.0.1:5000
 - ✅ **All API endpoints tested and functional**
+- ✅ **Group management system fully operational**
+- ✅ **Enhanced worker profiles with birthday & group support**
 - ✅ **SQLite database connected and working**
 - ✅ **Models and relationships validated**
 - ✅ **New payment system implemented**
 - ✅ **PIN authentication working**
 - ✅ **Auto-refresh ready for frontend**
 
-**The backend is 100% complete and ready for frontend integration!** 🚀
+**The backend is 100% complete with Group management and ready for frontend integration!** 🚀
 
 ## 🔍 API Response Examples
 
@@ -278,4 +409,77 @@ Remaining Debt: 7,500 DA (15,000 - 7,500)
     "advance_policy": "Advances deducted from earned salary"
   }
 }
+```
+
+### **🆕 Groups Response:**
+```json
+[
+  {
+    "id": 1,
+    "name": "Production Team Alpha",
+    "team_leader_id": 1,
+    "team_leader_name": "Ahmed Ali",
+    "workers_count": 3,
+    "created_at": "2025-07-22T00:30:00",
+    "is_active": true
+  },
+  {
+    "id": 2,
+    "name": "Quality Control Team",
+    "team_leader_id": 3,
+    "team_leader_name": "Sara Mohamed",
+    "workers_count": 2,
+    "created_at": "2025-07-22T00:35:00",
+    "is_active": true
+  }
+]
+```
+
+### **🆕 Enhanced Worker Response:**
+```json
+{
+  "id": 1,
+  "code": "W001",
+  "name": "Ahmed Ali",
+  "phone": "0555123456",
+  "position": "Team Leader",
+  "salary": 60000,
+  "hire_date": "2024-07-15",
+  "birthday": "1985-03-10",
+  "is_active": true,
+  "is_team_leader": true,
+  "group_id": 1,
+  "group_name": "Production Team Alpha",
+  "created_at": "2025-07-22T00:20:00"
+}
+```
+
+### **🆕 Group Workers Response:**
+```json
+[
+  {
+    "id": 1,
+    "name": "Ahmed Ali",
+    "position": "Team Leader",
+    "is_team_leader": true,
+    "birthday": "1985-03-10",
+    "group_name": "Production Team Alpha"
+  },
+  {
+    "id": 2,
+    "name": "Youcef Ferfour",
+    "position": "Technician",
+    "is_team_leader": false,
+    "birthday": "1995-03-20",
+    "group_name": "Production Team Alpha"
+  },
+  {
+    "id": 4,
+    "name": "Mohamed Saidi",
+    "position": "Operator",
+    "is_team_leader": false,
+    "birthday": "1992-08-15",
+    "group_name": "Production Team Alpha"
+  }
+]
 ```

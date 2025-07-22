@@ -348,43 +348,77 @@ async function loadWorkersTable() {
     tbody.innerHTML = workers.map(worker => `
         <tr>
             <td>
-                <input class="form-check-input" type="checkbox" value="${worker.id}">
-            </td>
-            <td>
                 <span class="badge bg-primary">${worker.code}</span>
             </td>
             <td>
-                <strong>${worker.name}</strong>
+                <div class="d-flex align-items-center">
+                    <div class="avatar-circle me-2" 
+                         style="background-color: #2c5aa0 !important; background-image: linear-gradient(135deg, #2c5aa0, #1e3f73) !important; color: white !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important;"
+                         data-bg="blue">
+                        ${getWorkerInitials(worker.name)}
+                    </div>
+                    <div>
+                        <strong>${worker.name}</strong>
+                        ${worker.is_team_leader ? '<br><span class="badge badge-sm bg-gradient-danger">Team Leader</span>' : ''}
+                    </div>
+                </div>
+            </td>
+            <td>
+                ${worker.group_name ? `
+                    <span class="badge bg-info">${worker.group_name}</span>
+                ` : '<span class="text-muted">No group</span>'}
             </td>
             <td>${worker.phone || '-'}</td>
-            <td>${formatCurrency(worker.salary)}</td>
+            <td><strong>${formatCurrency(worker.salary)}</strong></td>
             <td>${formatDate(worker.hire_date)}</td>
             <td>
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        Action
+                <div class="btn-group" role="group" aria-label="Worker Actions">
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="editWorker(${worker.id})" title="Edit Worker">
+                        <i class="bi bi-pencil me-1"></i>Edit
                     </button>
-                    <ul class="dropdown-menu">
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="editWorker(${worker.id})">
-                                <i class="bi bi-pencil me-2"></i>Edit Info
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="giveAdvanceModal(${worker.id}, '${worker.name}')">
-                                <i class="bi bi-cash me-2"></i>Give Advance
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#" onclick="giveSalaryModal(${worker.id}, '${worker.name}')">
-                                <i class="bi bi-wallet2 me-2"></i>Give Salary
-                            </a>
-                        </li>
-                    </ul>
+                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="giveAdvanceModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Massarif (Salary Advance)">
+                        <i class="bi bi-cash me-1"></i>Massarif
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="giveLoanModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Douyoun (Loan)">
+                        <i class="bi bi-credit-card me-1"></i>Douyoun
+                    </button>
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="giveSalaryModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Pay Salary">
+                        <i class="bi bi-wallet2 me-1"></i>Salary
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="confirmDeleteWorker(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', '${worker.code}', '${worker.position.replace(/'/g, "\\'")}')" title="Delete Worker">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
                 </div>
             </td>
         </tr>
     `).join('');
+}
+
+// Helper function to get worker initials for avatar
+function getWorkerInitials(name) {
+    if (!name) return '??';
+    const words = name.trim().split(' ');
+    if (words.length === 1) {
+        return words[0].substring(0, 2).toUpperCase();
+    }
+    return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+}
+
+// Load groups for worker form dropdown
+async function loadGroupsForWorkerForm() {
+    try {
+        const groups = await apiCall('/groups');
+        const groupSelect = document.getElementById('workerGroup');
+        
+        if (!groupSelect) return;
+        
+        groupSelect.innerHTML = '<option value="">No group assigned</option>';
+        groups.forEach(group => {
+            groupSelect.innerHTML += `<option value="${group.id}">${group.name}</option>`;
+        });
+    } catch (error) {
+        console.error('Error loading groups for worker form:', error);
+    }
 }
 
 // Modal Functions
@@ -633,6 +667,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Workers page
         testAPIConnection();
         loadWorkersTable();
+        loadGroupsForWorkerForm();
         startAutoRefresh();
         
         // Add event listener for submit button
@@ -656,16 +691,464 @@ window.refreshPayrollData = refreshPayrollData;
 window.verifyPin = verifyPin;
 
 // Additional functions that might be called from HTML
-window.editWorker = function(workerId) {
-    showAlert('Edit worker functionality - Under development', 'info');
+window.editWorker = async function(workerId) {
+    try {
+        showAlert('Loading worker data...', 'info');
+        
+        // Fetch worker data
+        const response = await fetch(`${API_BASE_URL}/workers/${workerId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch worker data');
+        }
+        
+        const worker = await response.json();
+        
+        // Populate edit form
+        document.getElementById('editWorkerId').value = worker.id;
+        document.getElementById('editWorkerName').value = worker.name;
+        document.getElementById('editWorkerPhone').value = worker.phone || '';
+        document.getElementById('editWorkerPosition').value = worker.position || '';
+        document.getElementById('editWorkerSalary').value = worker.salary;
+        
+        // Load groups for selection
+        await loadGroupsForEdit(worker.group_id);
+        
+        // Show modal
+        const editModal = new bootstrap.Modal(document.getElementById('editWorkerModal'));
+        editModal.show();
+        
+        // Clear any previous alerts
+        setTimeout(() => {
+            const alertElement = document.querySelector('.alert');
+            if (alertElement) {
+                alertElement.remove();
+            }
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error loading worker data:', error);
+        showAlert('Error loading worker data. Please try again.', 'danger');
+    }
 };
 
-window.giveAdvanceModal = function(workerId, workerName) {
-    showAlert('Give advance functionality - Under development', 'info');
+// Load groups for edit modal
+async function loadGroupsForEdit(currentGroupId = null) {
+    try {
+        // Check if we have a group dropdown in edit modal
+        let groupSelect = document.getElementById('editWorkerGroup');
+        if (!groupSelect) {
+            // If not, we'll add it dynamically
+            const positionField = document.getElementById('editWorkerPosition').parentElement;
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'mb-3';
+            groupDiv.innerHTML = `
+                <label for="editWorkerGroup" class="form-label">Group</label>
+                <select class="form-select" id="editWorkerGroup">
+                    <option value="">No group assigned</option>
+                </select>
+                <div class="form-text">You can change the worker's group assignment</div>
+            `;
+            positionField.insertAdjacentElement('afterend', groupDiv);
+            groupSelect = document.getElementById('editWorkerGroup');
+        }
+        
+        const groups = await fetchGroups();
+        groupSelect.innerHTML = '<option value="">No group assigned</option>';
+        groups.forEach(group => {
+            const selected = group.id === currentGroupId ? 'selected' : '';
+            groupSelect.innerHTML += `<option value="${group.id}" ${selected}>${group.name}</option>`;
+        });
+    } catch (error) {
+        console.error('Error loading groups:', error);
+    }
+}
+
+// Update Worker Function
+window.updateWorker = async function() {
+    try {
+        const form = document.getElementById('editWorkerForm');
+        const workerId = document.getElementById('editWorkerId').value;
+        const name = document.getElementById('editWorkerName').value.trim();
+        const phone = document.getElementById('editWorkerPhone').value.trim();
+        const position = document.getElementById('editWorkerPosition').value.trim();
+        const salary = parseFloat(document.getElementById('editWorkerSalary').value);
+        const groupId = document.getElementById('editWorkerGroup')?.value || null;
+        const adminPin = document.getElementById('editWorkerPin').value.trim();
+        
+        // Clear previous validation states
+        form.querySelectorAll('.form-control').forEach(input => {
+            input.classList.remove('is-valid', 'is-invalid');
+        });
+        
+        // Validation
+        let isValid = true;
+        
+        if (!name || name.length < 2) {
+            document.getElementById('editWorkerName').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('editWorkerName').classList.add('is-valid');
+        }
+        
+        if (!position || position.length < 2) {
+            document.getElementById('editWorkerPosition').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('editWorkerPosition').classList.add('is-valid');
+        }
+        
+        if (!salary || salary <= 0 || salary > 1000000) {
+            document.getElementById('editWorkerSalary').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('editWorkerSalary').classList.add('is-valid');
+        }
+        
+        // Validate phone if provided
+        if (phone && phone.length > 0) {
+            const phoneRegex = /^[0-9+\-\s()]{8,15}$/;
+            if (!phoneRegex.test(phone)) {
+                document.getElementById('editWorkerPhone').classList.add('is-invalid');
+                isValid = false;
+            } else {
+                document.getElementById('editWorkerPhone').classList.add('is-valid');
+            }
+        } else {
+            document.getElementById('editWorkerPhone').classList.add('is-valid');
+        }
+        
+        // Validate admin PIN
+        if (!adminPin || adminPin.length !== 4 || !/^\d{4}$/.test(adminPin)) {
+            document.getElementById('editWorkerPin').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('editWorkerPin').classList.add('is-valid');
+        }
+        
+        if (!isValid) {
+            showAlert('Please correct the highlighted fields before updating.', 'warning');
+            return;
+        }
+        
+        // Show loading state
+        const updateBtn = document.querySelector('#editWorkerModal .btn-primary');
+        const originalText = updateBtn.innerHTML;
+        updateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating...';
+        updateBtn.disabled = true;
+        
+        // Prepare update data
+        const updateData = {
+            name: name,
+            phone: phone || null,
+            position: position,
+            salary: salary,
+            group_id: groupId ? parseInt(groupId) : null,
+            admin_pin: adminPin
+        };
+        
+        // Send update request
+        const response = await fetch(`${API_BASE_URL}/workers/${workerId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Success - mark all fields as valid
+            form.querySelectorAll('.form-control').forEach(input => {
+                input.classList.remove('is-invalid');
+                input.classList.add('is-valid');
+            });
+            
+            showAlert(`✅ Worker "${name}" updated successfully!`, 'success');
+            
+            // Close modal after a brief delay
+            setTimeout(() => {
+                const editModal = bootstrap.Modal.getInstance(document.getElementById('editWorkerModal'));
+                editModal.hide();
+            }, 1500);
+            
+            // Reload workers table
+            await loadWorkersTable();
+            
+        } else {
+            throw new Error(result.error || 'Failed to update worker');
+        }
+        
+    } catch (error) {
+        console.error('Error updating worker:', error);
+        showAlert('❌ Error updating worker: ' + error.message, 'danger');
+    } finally {
+        // Reset button state
+        const updateBtn = document.querySelector('#editWorkerModal .btn-primary');
+        if (updateBtn) {
+            updateBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Update Worker';
+            updateBtn.disabled = false;
+        }
+    }
 };
 
-window.giveSalaryModal = function(workerId, workerName) {
-    showAlert('Give salary functionality - Under development', 'info');
+// Fetch Groups function
+async function fetchGroups() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/groups`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch groups');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching groups:', error);
+        return [];
+    }
+}
+
+window.giveAdvanceModal = function(workerId, workerName, workerSalary) {
+    // Populate modal fields
+    document.getElementById('advanceWorkerId').value = workerId;
+    document.getElementById('advanceWorkerName').value = workerName;
+    document.getElementById('advanceWorkerSalary').value = formatCurrency(workerSalary);
+    
+    // Clear previous form data and validation states
+    document.getElementById('advanceAmount').value = '';
+    document.getElementById('advanceReason').value = '';
+    document.getElementById('advancePin').value = '';
+    
+    // Clear validation states
+    const form = document.getElementById('giveAdvanceForm');
+    form.querySelectorAll('.form-control').forEach(input => {
+        input.classList.remove('is-valid', 'is-invalid');
+    });
+    
+    // Show modal
+    const advanceModal = new bootstrap.Modal(document.getElementById('giveAdvanceModal'));
+    advanceModal.show();
+};
+
+// Process Advance Payment Function
+window.processAdvance = async function() {
+    try {
+        const form = document.getElementById('giveAdvanceForm');
+        const workerId = document.getElementById('advanceWorkerId').value;
+        const workerName = document.getElementById('advanceWorkerName').value;
+        const workerSalary = parseFloat(document.getElementById('advanceWorkerSalary').value.replace(/[^0-9.-]+/g, ""));
+        const amount = parseFloat(document.getElementById('advanceAmount').value);
+        const reason = document.getElementById('advanceReason').value.trim();
+        const adminPin = document.getElementById('advancePin').value.trim();
+        
+        // Clear previous validation states
+        form.querySelectorAll('.form-control').forEach(input => {
+            input.classList.remove('is-valid', 'is-invalid');
+        });
+        
+        // Validation
+        let isValid = true;
+        
+        // Validate amount against worker salary (Massarif rule)
+        if (!amount || amount <= 0) {
+            document.getElementById('advanceAmount').classList.add('is-invalid');
+            showAlert('❌ Please enter a valid advance amount.', 'error');
+            isValid = false;
+        } else if (amount > workerSalary) {
+            document.getElementById('advanceAmount').classList.add('is-invalid');
+            showAlert(`❌ Massarif amount (${formatCurrency(amount)}) cannot exceed worker salary (${formatCurrency(workerSalary)}).`, 'error');
+            isValid = false;
+        } else {
+            document.getElementById('advanceAmount').classList.add('is-valid');
+        }
+        
+        // Validate admin PIN
+        if (!adminPin || adminPin.length !== 4 || !/^\d{4}$/.test(adminPin)) {
+            document.getElementById('advancePin').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('advancePin').classList.add('is-valid');
+        }
+        
+        // Mark reason as valid (optional field)
+        document.getElementById('advanceReason').classList.add('is-valid');
+        
+        if (!isValid) {
+            return;
+        }
+        
+        // Show loading state
+        const processBtn = document.querySelector('#giveAdvanceModal .btn-warning');
+        const originalText = processBtn.innerHTML;
+        processBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+        processBtn.disabled = true;
+        
+        // Prepare advance data
+        const advanceData = {
+            worker_id: parseInt(workerId),
+            amount: amount,
+            reason: reason || null,
+            admin_pin: adminPin
+        };
+        
+        // Send advance request
+        const response = await fetch(`${API_BASE_URL}/advances`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(advanceData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Success - mark all fields as valid
+            form.querySelectorAll('.form-control').forEach(input => {
+                input.classList.remove('is-invalid');
+                input.classList.add('is-valid');
+            });
+            
+            showAlert(`✅ Advance of ${formatCurrency(amount)} given to ${workerName} successfully!`, 'success');
+            
+            // Close modal after a short delay
+            setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('giveAdvanceModal'));
+                modal.hide();
+                
+                // Refresh workers table to show updated data
+                loadWorkers();
+            }, 1500);
+            
+        } else {
+            // Error from server
+            showAlert(`❌ Error processing advance: ${result.error || 'Unknown error'}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error processing advance:', error);
+        showAlert('❌ Error processing advance. Please check your connection and try again.', 'error');
+    } finally {
+        // Restore button state
+        const processBtn = document.querySelector('#giveAdvanceModal .btn-warning');
+        if (processBtn) {
+            processBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Give Massarif';
+            processBtn.disabled = false;
+        }
+    }
+};
+
+// LOAN (DOUYOUN) FUNCTIONS
+
+window.giveLoanModal = function(workerId, workerName, workerSalary) {
+    console.log('Opening loan modal for:', workerId, workerName, workerSalary);
+    
+    // Clear previous data
+    document.getElementById('loanWorkerId').value = workerId;
+    document.getElementById('loanWorkerName').value = workerName;
+    document.getElementById('loanWorkerSalary').value = formatCurrency(workerSalary);
+    document.getElementById('loanAmount').value = '';
+    document.getElementById('loanReason').value = '';
+    document.getElementById('loanPin').value = '';
+    
+    // Clear validation states
+    const form = document.getElementById('giveLoanForm');
+    form.classList.remove('was-validated');
+    
+    // Show modal
+    const loanModal = new bootstrap.Modal(document.getElementById('giveLoanModal'));
+    loanModal.show();
+};
+
+window.processLoan = async function() {
+    console.log('Processing loan...');
+    
+    // Get form data
+    const workerId = document.getElementById('loanWorkerId').value;
+    const workerName = document.getElementById('loanWorkerName').value;
+    const amount = parseFloat(document.getElementById('loanAmount').value);
+    const reason = document.getElementById('loanReason').value.trim();
+    const adminPin = document.getElementById('loanPin').value.trim();
+    
+    // Validate form
+    const form = document.getElementById('giveLoanForm');
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        showAlert('❌ Please fill in all required fields correctly.', 'error');
+        return;
+    }
+    
+    // Additional validations
+    if (!amount || amount <= 0) {
+        showAlert('❌ Please enter a valid loan amount.', 'error');
+        return;
+    }
+    
+    if (!adminPin || adminPin.length !== 4) {
+        showAlert('❌ Please enter a valid 4-digit admin PIN.', 'error');
+        return;
+    }
+    
+    // Update button state
+    const processBtn = document.querySelector('#giveLoanModal .btn-danger');
+    if (processBtn) {
+        processBtn.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Processing...';
+        processBtn.disabled = true;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/loans`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Pin': adminPin
+            },
+            body: JSON.stringify({
+                worker_id: parseInt(workerId),
+                amount: amount,
+                reason: reason || null
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Success
+            console.log('Loan processed successfully:', result);
+            
+            // Clear form
+            document.getElementById('giveLoanForm').reset();
+            document.getElementById('giveLoanForm').classList.remove('was-validated');
+            
+            showAlert(`✅ Loan of ${formatCurrency(amount)} given to ${workerName} successfully!`, 'success');
+            
+            // Close modal after a short delay
+            setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('giveLoanModal'));
+                modal.hide();
+                
+                // Refresh workers table to show updated data
+                loadWorkers();
+            }, 1500);
+            
+        } else {
+            // Error from server
+            showAlert(`❌ Error processing loan: ${result.error || 'Unknown error'}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error processing loan:', error);
+        showAlert('❌ Error processing loan. Please check your connection and try again.', 'error');
+    } finally {
+        // Restore button state
+        const processBtn = document.querySelector('#giveLoanModal .btn-danger');
+        if (processBtn) {
+            processBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Give Loan';
+            processBtn.disabled = false;
+        }
+    }
+};
+
+window.giveSalaryModal = function(workerId, workerName, workerSalary) {
+    showAlert(`Pay salary to ${workerName} (Amount: ${formatCurrency(workerSalary)}) - Under development`, 'info');
 };
 
 window.handleAddWorker = function() {
@@ -675,12 +1158,14 @@ window.handleAddWorker = function() {
     const code = document.getElementById('workerCode').value.trim();
     const name = document.getElementById('workerName').value.trim();
     const phone = document.getElementById('workerPhone').value.trim();
+    const birthday = document.getElementById('workerBirthday').value;
     const position = document.getElementById('workerPosition').value.trim();
+    const groupId = document.getElementById('workerGroup').value;
     const salary = parseFloat(document.getElementById('workerSalary').value);
     const hireDate = document.getElementById('workerHireDate').value;
     const adminPin = document.getElementById('adminPin').value.trim();
     
-    console.log('Form data:', { code, name, phone, position, salary, hireDate, adminPin: '***' });
+    console.log('Form data:', { code, name, phone, birthday, position, groupId, salary, hireDate, adminPin: '***' });
     
     // Validate required fields
     if (!code || !name || !position || !salary || !hireDate || !adminPin) {
@@ -696,14 +1181,16 @@ window.handleAddWorker = function() {
         return;
     }
     
-    // Prepare worker data exactly like the PowerShell command
+    // Prepare worker data with new fields
     const workerData = {
         code: code,
         name: name,
         position: position,
         salary: salary,
         hire_date: hireDate,
-        phone: phone || null
+        phone: phone || null,
+        birthday: birthday || null,
+        group_id: groupId ? parseInt(groupId) : null
     };
     
     console.log('Worker data prepared:', workerData);
@@ -830,4 +1317,125 @@ async function generateNextWorkerCode() {
 
 window.clockInOut = function() {
     showAlert('Clock In/Out functionality - Under development', 'info');
+};
+
+// DELETE WORKER FUNCTIONS
+
+// Global variable to store worker data for deletion
+let currentDeleteWorkerId = null;
+
+// Show delete confirmation modal
+window.confirmDeleteWorker = function(workerId, workerName, workerCode, workerPosition) {
+    console.log('Delete button clicked! Confirming delete for worker:', workerId, workerName, workerCode, workerPosition);
+    alert('Delete button clicked for worker: ' + workerName); // Temporary debug alert
+    
+    // Store worker data for deletion
+    currentDeleteWorkerId = workerId;
+    
+    // Populate delete modal with worker information
+    document.getElementById('deleteWorkerName').textContent = workerName;
+    document.getElementById('deleteWorkerCode').textContent = workerCode;
+    document.getElementById('deleteWorkerPosition').textContent = workerPosition;
+    
+    // Show delete confirmation modal
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteWorkerModal'));
+    deleteModal.show();
+};
+
+// Request PIN for delete action
+window.requestDeletePin = function() {
+    // Hide delete confirmation modal
+    const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteWorkerModal'));
+    if (deleteModal) {
+        deleteModal.hide();
+    }
+    
+    // Clear PIN input and error message
+    document.getElementById('pinModalAdminPin').value = '';
+    document.getElementById('deletePinError').classList.add('d-none');
+    
+    // Show PIN modal
+    const pinModal = new bootstrap.Modal(document.getElementById('deletePinModal'));
+    pinModal.show();
+};
+
+// Handle worker deletion with PIN verification
+window.handleDeleteWorker = async function() {
+    const adminPin = document.getElementById('pinModalAdminPin').value.trim();
+    const errorDiv = document.getElementById('deletePinError');
+    
+    // Clear previous error
+    errorDiv.classList.add('d-none');
+    
+    // Validate PIN
+    if (!adminPin || adminPin.length !== 4) {
+        errorDiv.textContent = 'Please enter a valid 4-digit PIN';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    if (!currentDeleteWorkerId) {
+        errorDiv.textContent = 'No worker selected for deletion';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        const deleteBtn = document.querySelector('#deletePinModal .btn-danger');
+        const originalText = deleteBtn.innerHTML;
+        deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+        deleteBtn.disabled = true;
+        
+        // Send delete request
+        const response = await fetch(`${API_BASE_URL}/workers/${currentDeleteWorkerId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Pin': adminPin
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Success - close modals
+            const pinModal = bootstrap.Modal.getInstance(document.getElementById('deletePinModal'));
+            if (pinModal) {
+                pinModal.hide();
+            }
+            
+            // Reset state
+            currentDeleteWorkerId = null;
+            
+            // Reload workers table
+            await loadWorkersTable();
+            
+            // Show success message
+            showAlert('✅ Worker deleted successfully!', 'success');
+            
+        } else {
+            // Handle errors
+            if (response.status === 401) {
+                errorDiv.textContent = 'Invalid admin PIN. Please try again.';
+            } else if (response.status === 404) {
+                errorDiv.textContent = 'Worker not found.';
+            } else {
+                errorDiv.textContent = result.error || 'Failed to delete worker. Please try again.';
+            }
+            errorDiv.classList.remove('d-none');
+        }
+        
+    } catch (error) {
+        console.error('Error deleting worker:', error);
+        errorDiv.textContent = 'Network error. Please check your connection and try again.';
+        errorDiv.classList.remove('d-none');
+    } finally {
+        // Reset button state
+        const deleteBtn = document.querySelector('#deletePinModal .btn-danger');
+        if (deleteBtn) {
+            deleteBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Confirm Delete';
+            deleteBtn.disabled = false;
+        }
+    }
 };
