@@ -163,6 +163,49 @@
                     </div>
                 </div>
 
+                <!-- Workers Due for Payment Today -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card shadow">
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-primary">
+                                    <i class="bi bi-calendar-check me-2"></i>Workers Due for Payment Today
+                                </h6>
+                                <span class="badge bg-primary" id="paymentDueCount">0</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="paymentDueTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Worker</th>
+                                                <th>Position</th>
+                                                <th>Salary</th>
+                                                <th>Advances</th>
+                                                <th>Net Pay</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="paymentDueTableBody">
+                                            <tr>
+                                                <td colspan="6" class="text-center">
+                                                    <div class="spinner-border" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="noPaymentsDue" class="text-center text-muted py-4" style="display: none;">
+                                    <i class="bi bi-check-circle fs-1 text-success mb-3"></i>
+                                    <p class="mb-0">No workers are due for payment today.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Recent Activity -->
                 <div class="row">
                     <div class="col-lg-8">
@@ -240,6 +283,32 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- Salary Payment Modal -->
+    <div class="modal fade" id="salaryModal" tabindex="-1" aria-labelledby="salaryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="salaryModalLabel">
+                        <i class="bi bi-currency-dollar me-2"></i>Give Salary
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Worker:</strong> <span id="salaryModalWorkerName"></span></p>
+                    <p><strong>Salary:</strong> <span id="salaryModalSalary"></span></p>
+                    <p><strong>Massarif (Advances this month):</strong> <span id="salaryModalMassarif"></span></p>
+                    <p><strong>Amount to Pay:</strong> <span id="salaryModalAmountToPay"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" id="salaryModalPayBtn" style="display:none;">
+                        <i class="bi bi-check-circle me-1"></i>Pay Salary
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
