@@ -648,16 +648,39 @@ def create_app():
     
     @app.route('/api/payments/summary', methods=['GET'])
     def payment_summary():
+        from sqlalchemy import extract, and_
+        today = date.today()
+        current_year = today.year
+        current_month = today.month
+        next_month = (today.replace(day=28) + relativedelta(days=4)).replace(day=1)
+
         workers = Worker.query.filter_by(is_active=True).all()
         summary = []
         total_earned_payroll = 0
         total_advances_given = 0
         total_final_payments = 0
-        
+
+        # New monthly fields
+        total_loans_this_month = 0
+        total_advances_this_month = 0
+        total_paid_to_workers_this_month = 0
+
+        # Get all advances and loans for this month
+        advances_this_month = Advance.query.filter(
+            extract('year', Advance.date_given) == current_year,
+            extract('month', Advance.date_given) == current_month
+        ).all()
+        loans_this_month = Loan.query.filter(
+            extract('year', Loan.date_given) == current_year,
+            extract('month', Loan.date_given) == current_month
+        ).all()
+        total_advances_this_month = sum(a.amount for a in advances_this_month)
+        total_loans_this_month = sum(l.total_amount for l in loans_this_month)
+
         for worker in workers:
             # Get current monthly cycle based on hire date
             cycle_start, cycle_end = get_current_cycle_dates(worker.hire_date)
-            
+
             # Calculate total hours worked in current cycle
             sessions = WorkSession.query.filter(
                 WorkSession.worker_id == worker.id,
@@ -665,28 +688,28 @@ def create_app():
                 WorkSession.date <= cycle_end,
                 WorkSession.hours_worked.isnot(None)
             ).all()
-            
             total_hours = sum(session.hours_worked for session in sessions)
-            
-            # Calculate unpaid advances
+
+            # Calculate unpaid advances (old logic)
             unpaid_advances = Advance.query.filter_by(
                 worker_id=worker.id,
                 is_paid_back=False
             ).all()
-            
             total_advances = sum(advance.amount for advance in unpaid_advances)
-            
+
+            # Calculate advances for this month for this worker
+            advances_for_worker_this_month = [a for a in advances_this_month if a.worker_id == worker.id]
+            advances_this_worker_month = sum(a.amount for a in advances_for_worker_this_month)
+
             # Fixed monthly salary calculation (attendance tracked but not affecting pay)
             required_hours = 160  # Still tracked for attendance monitoring
             earned_salary = worker.salary  # Always full salary regardless of hours
             completion_percentage = round((total_hours / required_hours) * 100, 1) if required_hours > 0 else 100
-            
-            # Note: Hours are tracked for attendance purposes but don't affect salary calculation
-            
-            # Calculate final payment
+
+            # Calculate final payment (old logic)
             final_payment = max(0, earned_salary - total_advances)
             remaining_debt = max(0, total_advances - earned_salary)
-            
+
             # Determine payment status (based on advances only, not hours)
             if total_advances == 0:
                 payment_status = "full_salary_no_advances"
@@ -694,7 +717,21 @@ def create_app():
                 payment_status = "full_salary_with_advances"
             else:
                 payment_status = "full_salary_excess_advances"
-            
+
+            # --- NEW: Check if worker is paid this month ---
+            # A worker is considered paid if their next_payment is in the next month
+            is_paid_this_month = False
+            if worker.next_payment:
+                # next_payment is a date object
+                np = worker.next_payment
+                # If next_payment is in the next month (relative to today)
+                if np.year == next_month.year and np.month == next_month.month:
+                    is_paid_this_month = True
+            # The amount paid is salary - advances for this month (like khadama salary button)
+            if is_paid_this_month:
+                amount_paid = max(0, earned_salary - advances_this_worker_month)
+                total_paid_to_workers_this_month += amount_paid
+
             worker_summary = {
                 'worker': worker.to_dict(),
                 'cycle_info': {
@@ -713,24 +750,30 @@ def create_app():
                     'earned_salary': round(earned_salary, 2),
                     'advances_taken': round(total_advances, 2),
                     'final_payment': round(final_payment, 2),
-                    'remaining_debt': round(remaining_debt, 2)
+                    'remaining_debt': round(remaining_debt, 2),
+                    'advances_this_month': round(advances_this_worker_month, 2),
                 },
                 'payment_status': payment_status,
-                'unpaid_advances_count': len(unpaid_advances)
+                'unpaid_advances_count': len(unpaid_advances),
+                'is_paid_this_month': is_paid_this_month
             }
-            
+
             summary.append(worker_summary)
             total_earned_payroll += earned_salary
             total_advances_given += total_advances
             total_final_payments += final_payment
-        
+
         return jsonify({
             'workers': summary,
             'totals': {
                 'total_earned_payroll': round(total_earned_payroll, 2),
                 'total_advances_given': round(total_advances_given, 2),
                 'total_final_payments': round(total_final_payments, 2),
-                'total_workers': len(summary)
+                'total_workers': len(summary),
+                # New fields:
+                'total_loans_this_month': round(total_loans_this_month, 2),
+                'total_advances_this_month': round(total_advances_this_month, 2),
+                'total_paid_to_workers_this_month': round(total_paid_to_workers_this_month, 2)
             },
             'system_info': {
                 'required_hours_per_month': 160,

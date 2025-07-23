@@ -299,10 +299,12 @@ function updateDashboardMetrics(workers, payrollData) {
             totalAdvancesEl.textContent = formatCurrency(payrollData.totals.total_advances_given);
         }
 
-        // Final Payments
+        // Final Payments (NEW LOGIC: sum of loans this month + advances this month + amount paid to workers this month)
         const finalPaymentsEl = document.getElementById('totalFinalPayments');
         if (finalPaymentsEl) {
-            finalPaymentsEl.textContent = formatCurrency(payrollData.totals.total_final_payments);
+            const t = payrollData.totals;
+            const finalPayments = (t.total_loans_this_month || 0) + (t.total_advances_this_month || 0) + (t.total_paid_to_workers_this_month || 0);
+            finalPaymentsEl.textContent = formatCurrency(finalPayments);
         }
     }
 }
