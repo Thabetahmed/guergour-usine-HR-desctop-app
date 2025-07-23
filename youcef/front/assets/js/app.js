@@ -368,7 +368,7 @@ async function loadWorkersTable() {
         return `
         <tr>
             <td><span class="badge bg-primary">${worker.code}</span></td>
-            <td><div class="d-flex align-items-center"><div class="avatar-circle me-2" style="background-color: #2c5aa0 !important; background-image: linear-gradient(135deg, #2c5aa0, #1e3f73) !important; color: white !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important;" data-bg="blue">${getWorkerInitials(worker.name)}</div><div><strong>${worker.name}</strong>${worker.is_team_leader ? '<br><span class="badge badge-sm bg-gradient-danger">Team Leader</span>' : ''}</div></div></td>
+            <td><div class="d-flex align-items-center"><div class="avatar-circle me-2" style="background-color: #2c5aa0 !important; background-image: linear-gradient(135deg, #2c5aa0, #1e3f73) !important; color: white !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important; cursor: pointer !important;" data-bg="blue" onclick="showWorkerProfile(${worker.id})" title="View worker profile">${getWorkerInitials(worker.name)}</div><div><strong>${worker.name}</strong>${worker.is_team_leader ? '<br><span class="badge badge-sm bg-gradient-danger">Team Leader</span>' : ''}</div></div></td>
             <td>${worker.group_name ? `<span class="badge bg-info">${worker.group_name}</span>` : '<span class="text-muted">No group</span>'}</td>
             <td>${worker.phone || '-'}</td>
             <td><strong>${formatCurrency(worker.salary)}</strong></td>
@@ -1202,16 +1202,10 @@ window.giveSalaryModal = async function(workerId, workerName, workerSalary, next
         let advances = [];
         try {
             const allAdvances = await apiCall('/advances');
-            // Calculate previous payment date (exactly one month before next_payment)
-            const previousPaymentDate = new Date(nextPayment);
-            previousPaymentDate.setMonth(previousPaymentDate.getMonth() - 1);
             
-            // Filter advances since previous payment date (not just current month)
+            // Filter unpaid advances for this worker (using is_paid_back attribute)
             advances = allAdvances.filter(a => {
-                if (a.worker_id !== workerId || !a.date_given) return false;
-                const advanceDate = new Date(a.date_given);
-                // Include advances from previous payment date up to today
-                return advanceDate >= previousPaymentDate && advanceDate <= today;
+                return a.worker_id === workerId && !a.is_paid_back;
             });
         } catch (e) {
             showAlert('Failed to fetch advances for this worker.', 'danger');
@@ -1512,3 +1506,304 @@ window.handleDeleteWorker = async function() {
         }
     }
 };
+
+// WORKER PROFILE FUNCTIONS
+
+window.showWorkerProfile = async function(workerId) {
+    console.log('Loading worker profile for ID:', workerId);
+    
+    try {
+        // Show modal with loading state
+        const modal = new bootstrap.Modal(document.getElementById('workerProfileModal'));
+        modal.show();
+        
+        // Load worker data and history
+        const [worker, advances, loans] = await Promise.all([
+            fetchWorkerById(workerId),
+            fetchWorkerAdvances(workerId),
+            fetchWorkerLoans(workerId)
+        ]);
+        
+        // Display worker profile
+        displayWorkerProfile(worker, advances, loans);
+        
+        // Setup action buttons
+        setupProfileActionButtons(worker);
+        
+    } catch (error) {
+        console.error('Error loading worker profile:', error);
+        document.getElementById('workerProfileContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Failed to load worker profile. Please try again.
+            </div>
+        `;
+    }
+};
+
+async function fetchWorkerById(workerId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/workers/${workerId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch worker data');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching worker:', error);
+        throw error;
+    }
+}
+
+async function fetchWorkerAdvances(workerId) {
+    try {
+        const allAdvances = await apiCall('/advances');
+        return allAdvances.filter(advance => advance.worker_id === workerId)
+                         .sort((a, b) => new Date(b.date_given) - new Date(a.date_given));
+    } catch (error) {
+        console.error('Error fetching worker advances:', error);
+        return [];
+    }
+}
+
+async function fetchWorkerLoans(workerId) {
+    try {
+        const allLoans = await apiCall('/loans');
+        return allLoans.filter(loan => loan.worker_id === workerId)
+                      .sort((a, b) => new Date(b.date_given) - new Date(a.date_given));
+    } catch (error) {
+        console.error('Error fetching worker loans:', error);
+        return [];
+    }
+}
+
+function displayWorkerProfile(worker, advances, loans) {
+    const profileContent = document.getElementById('workerProfileContent');
+    
+    // Calculate totals
+    const totalAdvances = advances.reduce((sum, advance) => sum + advance.amount, 0);
+    const unpaidAdvances = advances.filter(a => !a.is_paid_back).reduce((sum, a) => sum + a.amount, 0);
+    const totalLoans = loans.reduce((sum, loan) => sum + loan.total_amount, 0);
+    const unpaidLoans = loans.filter(l => !l.is_fully_paid).reduce((sum, l) => sum + (l.total_amount - (l.paid_amount || 0)), 0);
+    
+    profileContent.innerHTML = `
+        <!-- Worker Info Section -->
+        <div class="row mb-4">
+            <div class="col-md-4 text-center">
+                <div class="avatar-circle mx-auto mb-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1.5rem; text-transform: uppercase;">
+                    ${getWorkerInitials(worker.name)}
+                </div>
+                <h4 class="mb-1">${worker.name}</h4>
+                <p class="text-muted mb-0">${worker.code}</p>
+                ${worker.is_team_leader ? '<span class="badge bg-danger">Team Leader</span>' : ''}
+            </div>
+            <div class="col-md-8">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small">Position</label>
+                        <p class="fw-bold mb-0">${worker.position}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small">Monthly Salary</label>
+                        <p class="fw-bold mb-0 text-success">${formatCurrency(worker.salary)}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small">Phone</label>
+                        <p class="fw-bold mb-0">${worker.phone || '-'}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small">Group</label>
+                        <p class="fw-bold mb-0">${worker.group_name ? `<span class="badge bg-info">${worker.group_name}</span>` : '<span class="text-muted">No group</span>'}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small">Hire Date</label>
+                        <p class="fw-bold mb-0">${formatDate(worker.hire_date)}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small">Birthday</label>
+                        <p class="fw-bold mb-0">${worker.birthday ? formatDate(worker.birthday) : '-'}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label text-muted small">Next Payment</label>
+                        <p class="fw-bold mb-0">${worker.next_payment ? formatDate(worker.next_payment) : '-'}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <i class="bi bi-cash-stack fs-1 text-warning mb-2"></i>
+                        <h6 class="card-title">Total Advances</h6>
+                        <h5 class="text-warning">${formatCurrency(totalAdvances)}</h5>
+                        <small class="text-muted">Unpaid: ${formatCurrency(unpaidAdvances)}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <i class="bi bi-credit-card fs-1 text-danger mb-2"></i>
+                        <h6 class="card-title">Total Loans</h6>
+                        <h5 class="text-danger">${formatCurrency(totalLoans)}</h5>
+                        <small class="text-muted">Unpaid: ${formatCurrency(unpaidLoans)}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <i class="bi bi-wallet2 fs-1 text-success mb-2"></i>
+                        <h6 class="card-title">Net Salary</h6>
+                        <h5 class="text-success">${formatCurrency(Math.max(0, worker.salary - unpaidAdvances))}</h5>
+                        <small class="text-muted">Salary minus advances only</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <i class="bi bi-calendar-check fs-1 text-info mb-2"></i>
+                        <h6 class="card-title">Work Duration</h6>
+                        <h5 class="text-info">${calculateWorkDuration(worker.hire_date)}</h5>
+                        <small class="text-muted">Months</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs for History -->
+        <ul class="nav nav-tabs" id="historyTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="advances-tab" data-bs-toggle="tab" data-bs-target="#advances" type="button" role="tab" aria-controls="advances" aria-selected="true">
+                    <i class="bi bi-cash-stack me-1"></i>Advances History (${advances.length})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="loans-tab" data-bs-toggle="tab" data-bs-target="#loans" type="button" role="tab" aria-controls="loans" aria-selected="false">
+                    <i class="bi bi-credit-card me-1"></i>Loans History (${loans.length})
+                </button>
+            </li>
+        </ul>
+        <div class="tab-content mt-3" id="historyTabContent">
+            <!-- Advances Tab -->
+            <div class="tab-pane fade show active" id="advances" role="tabpanel" aria-labelledby="advances-tab">
+                ${generateAdvancesTable(advances)}
+            </div>
+            <!-- Loans Tab -->
+            <div class="tab-pane fade" id="loans" role="tabpanel" aria-labelledby="loans-tab">
+                ${generateLoansTable(loans)}
+            </div>
+        </div>
+    `;
+}
+
+function generateAdvancesTable(advances) {
+    if (advances.length === 0) {
+        return '<div class="text-center text-muted py-4">No advances found for this worker.</div>';
+    }
+
+    return `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Reason</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${advances.map(advance => `
+                        <tr>
+                            <td>${formatDate(advance.date_given)}</td>
+                            <td><strong>${formatCurrency(advance.amount)}</strong></td>
+                            <td>${advance.reason || '-'}</td>
+                            <td>
+                                <span class="badge ${advance.is_paid_back ? 'bg-success' : 'bg-warning'}">
+                                    ${advance.is_paid_back ? 'Paid Back' : 'Pending'}
+                                </span>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function generateLoansTable(loans) {
+    if (loans.length === 0) {
+        return '<div class="text-center text-muted py-4">No loans found for this worker.</div>';
+    }
+
+    return `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Total Amount</th>
+                        <th>Paid Amount</th>
+                        <th>Remaining</th>
+                        <th>Reason</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${loans.map(loan => {
+                        const paidAmount = loan.paid_amount || 0;
+                        const remaining = loan.total_amount - paidAmount;
+                        return `
+                            <tr>
+                                <td>${formatDate(loan.date_given)}</td>
+                                <td><strong>${formatCurrency(loan.total_amount)}</strong></td>
+                                <td>${formatCurrency(paidAmount)}</td>
+                                <td>${formatCurrency(remaining)}</td>
+                                <td>${loan.reason || '-'}</td>
+                                <td>
+                                    <span class="badge ${loan.is_fully_paid ? 'bg-success' : 'bg-danger'}">
+                                        ${loan.is_fully_paid ? 'Fully Paid' : 'Outstanding'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function calculateWorkDuration(hireDate) {
+    const hire = new Date(hireDate);
+    const now = new Date();
+    const months = (now.getFullYear() - hire.getFullYear()) * 12 + (now.getMonth() - hire.getMonth());
+    return Math.max(0, months);
+}
+
+function setupProfileActionButtons(worker) {
+    // Edit Worker button
+    document.getElementById('editWorkerFromProfile').onclick = function() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('workerProfileModal'));
+        modal.hide();
+        setTimeout(() => editWorker(worker.id), 300);
+    };
+    
+    // Give Advance button
+    document.getElementById('giveAdvanceFromProfile').onclick = function() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('workerProfileModal'));
+        modal.hide();
+        setTimeout(() => giveAdvanceModal(worker.id, worker.name, worker.salary), 300);
+    };
+    
+    // Give Loan button
+    document.getElementById('giveLoanFromProfile').onclick = function() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('workerProfileModal'));
+        modal.hide();
+        setTimeout(() => giveLoanModal(worker.id, worker.name, worker.salary), 300);
+    };
+}

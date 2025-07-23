@@ -361,8 +361,36 @@ def create_app():
                     return jsonify({'error': 'Invalid group'}), 400
             worker.group_id = group_id
         
+        # Update next_payment if provided (for salary payment processing)
+        if 'next_payment' in data:
+            if data['next_payment']:
+                try:
+                    new_next_payment = datetime.strptime(data['next_payment'], '%Y-%m-%d').date()
+                    # If we're updating next_payment, mark all unpaid advances as paid
+                    unpaid_advances = Advance.query.filter_by(
+                        worker_id=worker_id,
+                        is_paid_back=False
+                    ).all()
+                    
+                    for advance in unpaid_advances:
+                        advance.is_paid_back = True
+                    
+                    worker.next_payment = new_next_payment
+                    
+                except ValueError:
+                    return jsonify({'error': 'Invalid next_payment format. Use YYYY-MM-DD'}), 400
+            else:
+                worker.next_payment = None
+        
         db.session.commit()
-        return jsonify({'message': 'Worker updated successfully', 'worker': worker.to_dict()})
+        
+        # Prepare response message
+        message = 'Worker updated successfully'
+        if 'next_payment' in data and data['next_payment']:
+            marked_advances_count = len([a for a in Advance.query.filter_by(worker_id=worker_id, is_paid_back=True).all()])
+            message += f'. Salary paid and {marked_advances_count} advances marked as paid back.'
+        
+        return jsonify({'message': message, 'worker': worker.to_dict()})
     
     @app.route('/api/workers/<int:worker_id>', methods=['DELETE'])
     def delete_worker(worker_id):
@@ -503,12 +531,22 @@ def create_app():
         if not worker.is_active:
             return jsonify({'error': 'Worker is not active'}), 400
         
-        # Validate amount against salary (Massarif rule)
+        # Validate amount
         if not amount or amount <= 0:
             return jsonify({'error': 'Invalid advance amount'}), 400
         
-        if amount > worker.salary:
-            return jsonify({'error': f'Advance amount ({amount} DA) cannot exceed worker salary ({worker.salary} DA)'}), 400
+        # Calculate total unpaid advances for this worker
+        unpaid_advances = Advance.query.filter_by(
+            worker_id=worker_id,
+            is_paid_back=False
+        ).all()
+        total_unpaid_advances = sum(advance.amount for advance in unpaid_advances)
+        
+        # Check if new advance + existing unpaid advances would exceed salary
+        if (total_unpaid_advances + amount) > worker.salary:
+            return jsonify({
+                'error': f'Total unpaid advances ({total_unpaid_advances + amount} DA) would exceed worker salary ({worker.salary} DA). Current unpaid: {total_unpaid_advances} DA'
+            }), 400
         
         advance = Advance(
             worker_id=worker_id,

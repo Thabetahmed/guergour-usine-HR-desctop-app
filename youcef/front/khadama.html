@@ -509,6 +509,41 @@
         </div>
     </div>
 
+    <!-- Worker Profile Modal -->
+    <div class="modal fade" id="workerProfileModal" tabindex="-1" aria-labelledby="workerProfileModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="workerProfileModalLabel">
+                        <i class="bi bi-person-circle me-2"></i>Worker Profile
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="workerProfileContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading worker profile...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-primary" id="editWorkerFromProfile">
+                        <i class="bi bi-pencil me-1"></i>Edit Worker
+                    </button>
+                    <button type="button" class="btn btn-outline-warning" id="giveAdvanceFromProfile">
+                        <i class="bi bi-cash me-1"></i>Give Advance
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" id="giveLoanFromProfile">
+                        <i class="bi bi-credit-card me-1"></i>Give Loan
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- jQuery (required for DataTables) -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <!-- Bootstrap 5 JS -->
