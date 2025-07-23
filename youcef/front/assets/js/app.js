@@ -10,6 +10,11 @@ let workers = [];
 let payrollData = null;
 let refreshTimer = null;
 
+// Helper function to get current date
+function getCurrentDate() {
+    return new Date();
+}
+
 // Utility Functions
 function formatCurrency(amount) {
     return new Intl.NumberFormat('fr-DZ', {
@@ -210,7 +215,7 @@ function updateSystemStatus(elementId, status, type) {
 function updateCurrentDate() {
     const dateEl = document.getElementById('currentDate');
     if (dateEl) {
-        const now = new Date();
+        const now = getCurrentDate();
         const options = {
             weekday: 'long',
             year: 'numeric',
@@ -224,7 +229,7 @@ function updateCurrentDate() {
 function updateLastUpdateTime() {
     const lastUpdateEl = document.getElementById('lastUpdate');
     if (lastUpdateEl) {
-        lastUpdateEl.textContent = new Date().toLocaleTimeString('fr-FR');
+        lastUpdateEl.textContent = getCurrentDate().toLocaleTimeString('fr-FR');
     }
 }
 
@@ -272,6 +277,9 @@ async function loadDashboardData() {
         
         // Update recent sessions
         updateRecentSessions(recentSessions);
+        
+        // Load workers due for payment today
+        await loadPaymentDueWorkers(workersData);
         
         updateLastUpdateTime();
     } catch (error) {
@@ -343,6 +351,104 @@ function updateRecentSessions(sessions) {
     `).join('');
 }
 
+// Load workers due for payment today
+async function loadPaymentDueWorkers(workers) {
+    const tbody = document.getElementById('paymentDueTableBody');
+    const countBadge = document.getElementById('paymentDueCount');
+    const noPaymentsDiv = document.getElementById('noPaymentsDue');
+    const tableDiv = document.querySelector('#paymentDueTable').parentElement;
+    
+    if (!tbody) return;
+
+    try {
+        // Get today's date in YYYY-MM-DD format
+        const today = getCurrentDate().toISOString().split('T')[0];
+        
+        // Filter workers whose next_payment is today or overdue
+        const workersDueToday = workers.filter(worker => 
+            worker.next_payment && worker.next_payment <= today
+        );
+
+        // Update count badge
+        if (countBadge) {
+            countBadge.textContent = workersDueToday.length;
+        }
+
+        if (workersDueToday.length === 0) {
+            // Show no payments message
+            if (tableDiv) tableDiv.style.display = 'none';
+            if (noPaymentsDiv) noPaymentsDiv.style.display = 'block';
+            return;
+        }
+
+        // Show table and hide no payments message
+        if (tableDiv) tableDiv.style.display = 'block';
+        if (noPaymentsDiv) noPaymentsDiv.style.display = 'none';
+
+        // Get advances for calculation
+        const allAdvances = await apiCall('/advances');
+        
+        // Generate table rows
+        const rows = await Promise.all(workersDueToday.map(async worker => {
+            // Calculate unpaid advances for this worker
+            const workerAdvances = allAdvances.filter(a => 
+                a.worker_id === worker.id && !a.is_paid_back
+            );
+            const totalAdvances = workerAdvances.reduce((sum, a) => sum + a.amount, 0);
+            const netPay = worker.salary - totalAdvances;
+
+            return `
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-circle me-2" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">
+                                ${getWorkerInitials(worker.name)}
+                            </div>
+                            <div>
+                                <strong>${worker.name}</strong>
+                                <br><small class="text-muted">${worker.code}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>${worker.position}</td>
+                    <td class="text-success fw-bold">${formatCurrency(worker.salary)}</td>
+                    <td class="${totalAdvances > 0 ? 'text-warning' : 'text-muted'} fw-bold">
+                        ${formatCurrency(totalAdvances)}
+                    </td>
+                    <td class="text-primary fw-bold">${formatCurrency(netPay)}</td>
+                    <td>
+                        <button class="btn btn-success btn-sm" onclick="giveSalaryModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary}, '${worker.next_payment}')">
+                            <i class="bi bi-currency-dollar me-1"></i>Pay Salary
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }));
+
+        tbody.innerHTML = rows.join('');
+
+    } catch (error) {
+        console.error('Error loading payment due workers:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading payment data</td></tr>';
+    }
+}
+
+// Refresh Dashboard Function
+async function refreshDashboard() {
+    try {
+        showAlert('Refreshing dashboard...', 'info', 2000);
+        await testAPIConnection();
+        await loadDashboardData();
+        showAlert('Dashboard refreshed successfully', 'success', 3000);
+    } catch (error) {
+        console.error('Error refreshing dashboard:', error);
+        showAlert('Failed to refresh dashboard', 'danger');
+    }
+}
+
+// Make refreshDashboard available globally
+window.refreshDashboard = refreshDashboard;
+
 // Workers Management Functions
 async function loadWorkersTable() {
     const workers = await fetchWorkers();
@@ -355,14 +461,11 @@ async function loadWorkersTable() {
         return;
     }
 
-    const today = new Date();
+    const today = getCurrentDate();
     tbody.innerHTML = workers.map(worker => {
         const nextPayment = worker.next_payment ? new Date(worker.next_payment) : null;
         let salaryBtnClass = 'btn-outline-success';
-        if (nextPayment &&
-            today.getFullYear() === nextPayment.getFullYear() &&
-            today.getMonth() === nextPayment.getMonth() &&
-            today.getDate() === nextPayment.getDate()) {
+        if (nextPayment && getCurrentDate() >= nextPayment) {
             salaryBtnClass = 'btn-danger';
         }
         return `
@@ -1504,7 +1607,7 @@ async function updateWorkerNextPayment(workerId, nextPaymentStr) {
 
 // Update giveSalaryModal to pass workerId and nextPayment
 window.giveSalaryModal = async function(workerId, workerName, workerSalary, nextPaymentStr) {
-    const today = new Date();
+    const today = getCurrentDate();
     const nextPayment = nextPaymentStr ? new Date(nextPaymentStr) : null;
     if (!nextPayment) {
         showAlert('Next payment date not set for this worker.', 'warning');
@@ -1514,7 +1617,7 @@ window.giveSalaryModal = async function(workerId, workerName, workerSalary, next
         showAlert("Payment date didn't come yet", 'info');
         return;
     }
-    if (today.getFullYear() === nextPayment.getFullYear() && today.getMonth() === nextPayment.getMonth() && today.getDate() === nextPayment.getDate()) {
+    if (today >= nextPayment) {
         let advances = [];
         try {
             const allAdvances = await apiCall('/advances');
@@ -1659,7 +1762,7 @@ window.showAddWorkerModal = function() {
     generateNextWorkerCode();
     
     // Set default hire date to today
-    const today = new Date().toISOString().split('T')[0];
+    const today = getCurrentDate().toISOString().split('T')[0];
     const hireDateElement = document.getElementById('workerHireDate');
     if (hireDateElement) {
         hireDateElement.value = today;

@@ -6,6 +6,10 @@ from models import db, Group, Worker, WorkSession, Advance, Loan, LoanPayment
 from config import Config
 import os
 
+# Helper function to get current date
+def get_current_date():
+    return date.today()
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -29,7 +33,7 @@ def create_app():
     
     # Helper function to check if worker already clocked in today
     def is_worker_clocked_in(worker_id):
-        today = date.today()
+        today = get_current_date()  # Use fixed date instead of date.today()
         session = WorkSession.query.filter_by(
             worker_id=worker_id, 
             date=today, 
@@ -49,7 +53,7 @@ def create_app():
         from datetime import datetime, date
         from dateutil.relativedelta import relativedelta
         
-        today = date.today()
+        today = get_current_date()  # Use fixed date instead of date.today()
         hire_day = hire_date.day
         
         # Calculate current cycle start date
@@ -284,7 +288,7 @@ def create_app():
                 return jsonify({'error': 'Invalid group'}), 400
         
         hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
-        today = date.today()
+        today = get_current_date()  # Use fixed date instead of date.today()
         # Calculate next_payment
         if hire_date == today:
             # If hire_date is today, next_payment is one month from today
@@ -459,7 +463,7 @@ def create_app():
         session = WorkSession(
             worker_id=worker.id,
             clock_in=datetime.now(),
-            date=date.today()
+            date=get_current_date()  # Use fixed date instead of date.today()
         )
         
         db.session.add(session)
@@ -480,7 +484,7 @@ def create_app():
             return jsonify({'error': 'Worker not found'}), 404
         
         # Find today's open session
-        today = date.today()
+        today = get_current_date()  # Use fixed date instead of date.today()
         session = WorkSession.query.filter_by(
             worker_id=worker.id,
             date=today,
@@ -552,7 +556,7 @@ def create_app():
             worker_id=worker_id,
             amount=amount,
             reason=data.get('reason'),
-            date_given=date.today()
+            date_given=get_current_date()  # Use fixed date instead of date.today()
         )
         
         db.session.add(advance)
@@ -611,8 +615,8 @@ def create_app():
                 reason=data.get('reason')
             )
             
-            # Manually set the date since we're using date.today()
-            loan.date_given = date.today()
+            # Manually set the date since we're using get_current_date()
+            loan.date_given = get_current_date()  # Use fixed date instead of date.today()
             
             db.session.add(loan)
             db.session.commit()
@@ -660,7 +664,7 @@ def create_app():
         payment = LoanPayment(
             loan_id=loan_id,
             payment_amount=payment_amount,
-            payment_date=date.today(),
+            payment_date=get_current_date(),  # Use fixed date instead of date.today()
             notes=data.get('notes')
         )
         
@@ -687,7 +691,7 @@ def create_app():
     @app.route('/api/payments/summary', methods=['GET'])
     def payment_summary():
         from sqlalchemy import extract, and_
-        today = date.today()
+        today = get_current_date()  # Use fixed date instead of date.today()
         current_year = today.year
         current_month = today.month
         next_month = (today.replace(day=28) + relativedelta(days=4)).replace(day=1)
@@ -802,7 +806,7 @@ def create_app():
                 'cycle_info': {
                     'cycle_start': cycle_start.isoformat(),
                     'cycle_end': cycle_end.isoformat(),
-                    'days_remaining': (cycle_end - date.today()).days
+                    'days_remaining': (cycle_end - today).days
                 },
                 'work_progress': {
                     'hours_worked': round(total_hours, 2),
