@@ -10,6 +10,7 @@ CREATE TABLE workers (
     position TEXT NOT NULL,
     salary REAL NOT NULL,
     hire_date DATE NOT NULL,
+    next_payment DATE,
     is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

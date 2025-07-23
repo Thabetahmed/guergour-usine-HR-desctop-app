@@ -345,53 +345,34 @@ async function loadWorkersTable() {
         return;
     }
 
-    tbody.innerHTML = workers.map(worker => `
+    const today = new Date();
+    tbody.innerHTML = workers.map(worker => {
+        const nextPayment = worker.next_payment ? new Date(worker.next_payment) : null;
+        let salaryBtnClass = 'btn-outline-success';
+        if (nextPayment &&
+            today.getFullYear() === nextPayment.getFullYear() &&
+            today.getMonth() === nextPayment.getMonth() &&
+            today.getDate() === nextPayment.getDate()) {
+            salaryBtnClass = 'btn-danger';
+        }
+        return `
         <tr>
-            <td>
-                <span class="badge bg-primary">${worker.code}</span>
-            </td>
-            <td>
-                <div class="d-flex align-items-center">
-                    <div class="avatar-circle me-2" 
-                         style="background-color: #2c5aa0 !important; background-image: linear-gradient(135deg, #2c5aa0, #1e3f73) !important; color: white !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important;"
-                         data-bg="blue">
-                        ${getWorkerInitials(worker.name)}
-                    </div>
-                    <div>
-                        <strong>${worker.name}</strong>
-                        ${worker.is_team_leader ? '<br><span class="badge badge-sm bg-gradient-danger">Team Leader</span>' : ''}
-                    </div>
-                </div>
-            </td>
-            <td>
-                ${worker.group_name ? `
-                    <span class="badge bg-info">${worker.group_name}</span>
-                ` : '<span class="text-muted">No group</span>'}
-            </td>
+            <td><span class="badge bg-primary">${worker.code}</span></td>
+            <td><div class="d-flex align-items-center"><div class="avatar-circle me-2" style="background-color: #2c5aa0 !important; background-image: linear-gradient(135deg, #2c5aa0, #1e3f73) !important; color: white !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; font-size: 0.75rem !important; text-transform: uppercase !important;" data-bg="blue">${getWorkerInitials(worker.name)}</div><div><strong>${worker.name}</strong>${worker.is_team_leader ? '<br><span class="badge badge-sm bg-gradient-danger">Team Leader</span>' : ''}</div></div></td>
+            <td>${worker.group_name ? `<span class="badge bg-info">${worker.group_name}</span>` : '<span class="text-muted">No group</span>'}</td>
             <td>${worker.phone || '-'}</td>
             <td><strong>${formatCurrency(worker.salary)}</strong></td>
             <td>${formatDate(worker.hire_date)}</td>
-            <td>
-                <div class="btn-group" role="group" aria-label="Worker Actions">
-                    <button type="button" class="btn btn-outline-info btn-sm" onclick="editWorker(${worker.id})" title="Edit Worker">
-                        <i class="bi bi-pencil me-1"></i>Edit
-                    </button>
-                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="giveAdvanceModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Massarif (Salary Advance)">
-                        <i class="bi bi-cash me-1"></i>Massarif
-                    </button>
-                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="giveLoanModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Douyoun (Loan)">
-                        <i class="bi bi-credit-card me-1"></i>Douyoun
-                    </button>
-                    <button type="button" class="btn btn-outline-success btn-sm" onclick="giveSalaryModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Pay Salary">
-                        <i class="bi bi-wallet2 me-1"></i>Salary
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="confirmDeleteWorker(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', '${worker.code}', '${worker.position.replace(/'/g, "\\'")}')" title="Delete Worker">
-                        <i class="bi bi-trash me-1"></i>Delete
-                    </button>
-                </div>
-            </td>
+            <td><div class="btn-group" role="group" aria-label="Worker Actions">
+                <button type="button" class="btn btn-outline-info btn-sm" onclick="editWorker(${worker.id})" title="Edit Worker"><i class="bi bi-pencil me-1"></i>Edit</button>
+                <button type="button" class="btn btn-outline-warning btn-sm" onclick="giveAdvanceModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Massarif (Salary Advance)"><i class="bi bi-cash me-1"></i>Massarif</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="giveLoanModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Douyoun (Loan)"><i class="bi bi-credit-card me-1"></i>Douyoun</button>
+                <button type="button" class="btn ${salaryBtnClass} btn-sm" onclick="giveSalaryModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary}, '${worker.next_payment}')" title="Pay Salary"><i class="bi bi-wallet2 me-1"></i>Salary</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="confirmDeleteWorker(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', '${worker.code}', '${worker.position.replace(/'/g, "\\'")}')" title="Delete Worker"><i class="bi bi-trash me-1"></i>Delete</button>
+            </div></td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // Helper function to get worker initials for avatar
@@ -1147,8 +1128,80 @@ window.processLoan = async function() {
     }
 };
 
-window.giveSalaryModal = function(workerId, workerName, workerSalary) {
-    showAlert(`Pay salary to ${workerName} (Amount: ${formatCurrency(workerSalary)}) - Under development`, 'info');
+function showSalaryModal(workerName, salary, massarif, amountToPay, workerId, nextPayment) {
+    document.getElementById('salaryModalWorkerName').textContent = workerName;
+    document.getElementById('salaryModalSalary').textContent = formatCurrency(salary);
+    document.getElementById('salaryModalMassarif').textContent = formatCurrency(massarif);
+    document.getElementById('salaryModalAmountToPay').textContent = formatCurrency(amountToPay);
+    // Show Pay button only if workerId and nextPayment are provided
+    const payBtn = document.getElementById('salaryModalPayBtn');
+    if (payBtn) {
+        payBtn.style.display = (workerId && nextPayment) ? 'inline-block' : 'none';
+        payBtn.onclick = async function() {
+            await paySalaryAndUpdateNext(workerId, nextPayment);
+        };
+    }
+    const modal = new bootstrap.Modal(document.getElementById('salaryModal'));
+    modal.show();
+}
+
+async function paySalaryAndUpdateNext(workerId, currentNextPayment) {
+    // Calculate next month's date
+    const current = new Date(currentNextPayment);
+    const next = new Date(current);
+    next.setMonth(current.getMonth() + 1);
+    // Adjust for month overflow (e.g., Jan 31 -> Feb 28)
+    if (next.getDate() !== current.getDate()) {
+        next.setDate(0);
+    }
+    const nextPaymentStr = next.toISOString().split('T')[0];
+    try {
+        await updateWorkerNextPayment(workerId, nextPaymentStr);
+        showAlert('Salary paid and next payment date updated!<br>Next payment: <b>' + formatDate(nextPaymentStr) + '</b>', 'success', 7000);
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('salaryModal'));
+        if (modal) modal.hide();
+        // Refresh table
+        await loadWorkersTable();
+    } catch (e) {
+        showAlert('Failed to update next payment date.', 'danger');
+    }
+}
+
+async function updateWorkerNextPayment(workerId, nextPaymentStr) {
+    await apiCall(`/workers/${workerId}`, {
+        method: 'PUT',
+        headers: { 'X-Admin-Pin': ADMIN_PIN, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ next_payment: nextPaymentStr })
+    });
+}
+
+// Update giveSalaryModal to pass workerId and nextPayment
+window.giveSalaryModal = async function(workerId, workerName, workerSalary, nextPaymentStr) {
+    const today = new Date();
+    const nextPayment = nextPaymentStr ? new Date(nextPaymentStr) : null;
+    if (!nextPayment) {
+        showAlert('Next payment date not set for this worker.', 'warning');
+        return;
+    }
+    if (today < nextPayment) {
+        showAlert("Payment date didn't come yet", 'info');
+        return;
+    }
+    if (today.getFullYear() === nextPayment.getFullYear() && today.getMonth() === nextPayment.getMonth() && today.getDate() === nextPayment.getDate()) {
+        let advances = [];
+        try {
+            const allAdvances = await apiCall('/advances');
+            advances = allAdvances.filter(a => a.worker_id === workerId && a.date_given && (new Date(a.date_given)).getFullYear() === today.getFullYear() && (new Date(a.date_given)).getMonth() === today.getMonth());
+        } catch (e) {
+            showAlert('Failed to fetch advances for this worker.', 'danger');
+            return;
+        }
+        const massarif = advances.reduce((sum, a) => sum + a.amount, 0);
+        const amountToPay = workerSalary - massarif;
+        showSalaryModal(workerName, workerSalary, massarif, amountToPay, workerId, nextPaymentStr);
+        return;
+    }
 };
 
 window.handleAddWorker = function() {

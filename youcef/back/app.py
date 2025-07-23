@@ -283,13 +283,37 @@ def create_app():
             if not group or not group.is_active:
                 return jsonify({'error': 'Invalid group'}), 400
         
+        hire_date = datetime.strptime(data['hire_date'], '%Y-%m-%d').date()
+        today = date.today()
+        # Calculate next_payment
+        if hire_date == today:
+            # If hire_date is today, next_payment is one month from today
+            next_payment = hire_date + relativedelta(months=1)
+        else:
+            # If hire_date is in the past, next_payment is the same day as hire_date in the current or next month
+            if today.day <= hire_date.day:
+                # This month
+                try:
+                    next_payment = date(today.year, today.month, hire_date.day)
+                except ValueError:
+                    # Handle months with fewer days (e.g., Feb 30)
+                    next_payment = (date(today.year, today.month, 1) + relativedelta(months=1, days=-1))
+            else:
+                # Next month
+                next_month = today + relativedelta(months=1)
+                try:
+                    next_payment = date(next_month.year, next_month.month, hire_date.day)
+                except ValueError:
+                    next_payment = (date(next_month.year, next_month.month, 1) + relativedelta(months=1, days=-1))
+        
         worker = Worker(
             code=data['code'],
             name=data['name'],
             phone=data.get('phone'),
             position=data['position'],
             salary=data['salary'],
-            hire_date=datetime.strptime(data['hire_date'], '%Y-%m-%d').date(),
+            hire_date=hire_date,
+            next_payment=next_payment,
             birthday=birthday,
             group_id=group_id,
             is_team_leader=data.get('is_team_leader', False)

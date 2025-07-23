@@ -37,6 +37,7 @@ class Worker(db.Model):
     position = db.Column(db.Text, nullable=False)
     salary = db.Column(db.Float, nullable=False)
     hire_date = db.Column(db.Date, nullable=False)
+    next_payment = db.Column(db.Date, nullable=True)
     birthday = db.Column(db.Date, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     is_team_leader = db.Column(db.Boolean, default=False)
@@ -57,6 +58,7 @@ class Worker(db.Model):
             'position': self.position,
             'salary': self.salary,
             'hire_date': self.hire_date.isoformat() if self.hire_date else None,
+            'next_payment': self.next_payment.isoformat() if self.next_payment else None,
             'birthday': self.birthday.isoformat() if self.birthday else None,
             'is_active': self.is_active,
             'is_team_leader': self.is_team_leader,
