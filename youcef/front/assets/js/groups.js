@@ -16,6 +16,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('refreshBtn').addEventListener('click', refreshData);
     document.getElementById('groupForm').addEventListener('submit', handleGroupSubmit);
     document.getElementById('confirmDeleteBtn').addEventListener('click', handleDeleteGroup);
+    
+    // Event delegation for delete group buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.delete-group-btn')) {
+            e.preventDefault();
+            const deleteBtn = e.target.closest('.delete-group-btn');
+            const groupId = parseInt(deleteBtn.dataset.groupId);
+            const groupName = deleteBtn.dataset.groupName;
+            confirmDeleteGroup(groupId, groupName);
+        }
+    });
 });
 
 // Load all groups from API
@@ -78,7 +89,7 @@ function renderGroups(groups) {
                                     <i class="bi bi-people me-2"></i>Manage Members
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item text-danger" href="#" onclick="confirmDeleteGroup(${group.id}, '${group.name}')">
+                                <li><a class="dropdown-item text-danger delete-group-btn" href="#" data-group-id="${group.id}" data-group-name="${group.name}">
                                     <i class="bi bi-trash me-2"></i>Delete Group
                                 </a></li>
                             </ul>
@@ -252,6 +263,13 @@ async function handleGroupSubmit(e) {
 
 // Confirm delete group
 function confirmDeleteGroup(groupId, groupName) {
+    console.log('Confirming delete for group:', groupId, groupName);
+    
+    if (!groupId || !groupName) {
+        showAlert('Invalid group data for deletion', 'danger');
+        return;
+    }
+    
     document.getElementById('deleteGroupName').textContent = groupName;
     currentGroupId = groupId;
     
@@ -261,26 +279,52 @@ function confirmDeleteGroup(groupId, groupName) {
 
 // Handle delete group
 async function handleDeleteGroup() {
+    if (!currentGroupId) {
+        showAlert('No group selected for deletion', 'danger');
+        return;
+    }
+    
     try {
+        // Show loading state
+        const deleteBtn = document.getElementById('confirmDeleteBtn');
+        const originalText = deleteBtn.innerHTML;
+        deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+        deleteBtn.disabled = true;
+        
+        console.log('Deleting group with ID:', currentGroupId);
+        
         const response = await fetch(`${API_BASE}/groups/${currentGroupId}`, {
             method: 'DELETE',
             headers: {
-                'X-Admin-Pin': ADMIN_PIN
+                'X-Admin-Pin': ADMIN_PIN,
+                'Content-Type': 'application/json'
             }
         });
         
+        console.log('Delete response status:', response.status);
+        
         const result = await response.json();
+        console.log('Delete response body:', result);
         
         if (response.ok) {
-            showAlert(result.message, 'success');
+            showAlert(result.message || 'Group deleted successfully', 'success');
             bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+            currentGroupId = null; // Reset after successful deletion
             refreshData();
         } else {
-            showAlert(result.error, 'danger');
+            showAlert(result.error || `Failed to delete group (Status: ${response.status})`, 'danger');
         }
+        
     } catch (error) {
         console.error('Error deleting group:', error);
-        showAlert('Error deleting group', 'danger');
+        showAlert('Network error while deleting group. Please check your connection.', 'danger');
+    } finally {
+        // Restore button state
+        const deleteBtn = document.getElementById('confirmDeleteBtn');
+        if (deleteBtn) {
+            deleteBtn.innerHTML = '<i class="bi bi-trash me-2"></i>Delete Group';
+            deleteBtn.disabled = false;
+        }
     }
 }
 
