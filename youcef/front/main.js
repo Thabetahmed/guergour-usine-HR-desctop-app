@@ -7,14 +7,48 @@ let flaskProcess = null;
 
 // Auto-start Flask backend
 function startFlaskServer() {
-    const flaskPath = path.join(__dirname, '..', 'back', 'app.py');
-    
     try {
         console.log('🚀 Starting Flask backend...');
-        flaskProcess = spawn('python', [flaskPath], {
-            cwd: path.join(__dirname, '..', 'back'),
-            stdio: 'inherit'
+        
+        let flaskExecutable;
+        let flaskArgs = [];
+        let flaskCwd;
+        
+        // Check if running in development or production
+        if (app.isPackaged) {
+            // Production mode - use bundled executable
+            const resourcesPath = process.resourcesPath;
+            flaskExecutable = path.join(resourcesPath, 'backend', 'gplast-factory-backend.exe');
+            flaskCwd = path.join(resourcesPath, 'backend');
+            console.log('� Production mode - using bundled backend:', flaskExecutable);
+        } else {
+            // Development mode - use Python script
+            const flaskPath = path.join(__dirname, '..', 'back', 'app.py');
+            flaskExecutable = 'python';
+            flaskArgs = [flaskPath];
+            flaskCwd = path.join(__dirname, '..', 'back');
+            console.log('🔧 Development mode - using Python script:', flaskPath);
+        }
+        
+        // Start the Flask process
+        flaskProcess = spawn(flaskExecutable, flaskArgs, {
+            cwd: flaskCwd,
+            stdio: 'pipe', // Changed to pipe to capture output
+            detached: false
         });
+        
+        // Log backend output for debugging
+        if (flaskProcess.stdout) {
+            flaskProcess.stdout.on('data', (data) => {
+                console.log('Backend stdout:', data.toString());
+            });
+        }
+        
+        if (flaskProcess.stderr) {
+            flaskProcess.stderr.on('data', (data) => {
+                console.error('Backend stderr:', data.toString());
+            });
+        }
         
         flaskProcess.on('error', (error) => {
             console.error('❌ Failed to start Flask server:', error);

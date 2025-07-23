@@ -6,14 +6,22 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "build-backend": "cd ../back && pyinstaller app.spec --clean",
+    "build-all": "npm run build-backend && npm run build",
+    "dist": "npm run build-all"
   },
-  "keywords": ["factory", "management", "electron", "gplast"],
+  "keywords": [
+    "factory",
+    "management",
+    "electron",
+    "gplast"
+  ],
   "author": "GPLAST Team",
   "license": "MIT",
   "devDependencies": {
     "electron": "^27.0.0",
-    "electron-builder": "^24.6.4"
+    "electron-builder": "^24.13.3"
   },
   "dependencies": {
     "axios": "^1.5.0"
@@ -26,7 +34,32 @@
     },
     "files": [
       "**/*",
-      "!node_modules/**/*"
-    ]
+      "!node_modules/**/*",
+      "!dist/**/*",
+      "!build/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../back/dist/gplast-factory-backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/images/logo.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
