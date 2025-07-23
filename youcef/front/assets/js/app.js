@@ -375,8 +375,8 @@ async function loadWorkersTable() {
             <td>${formatDate(worker.hire_date)}</td>
             <td><div class="btn-group" role="group" aria-label="Worker Actions">
                 <button type="button" class="btn btn-outline-info btn-sm" onclick="editWorker(${worker.id})" title="Edit Worker"><i class="bi bi-pencil me-1"></i>Edit</button>
-                <button type="button" class="btn btn-outline-warning btn-sm" onclick="giveAdvanceModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Massarif (Salary Advance)"><i class="bi bi-cash me-1"></i>Massarif</button>
-                <button type="button" class="btn btn-outline-danger btn-sm" onclick="giveLoanModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Douyoun (Loan)"><i class="bi bi-credit-card me-1"></i>Douyoun</button>
+                <button type="button" class="btn btn-outline-warning btn-sm" onclick="giveAdvanceModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Give Salary Advance (Massarif)"><i class="bi bi-cash me-1"></i>Massarif</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="showLoanOptions(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary})" title="Loan Operations (New Loan or Pay Existing)"><i class="bi bi-credit-card me-1"></i>Douyoun</button>
                 <button type="button" class="btn ${salaryBtnClass} btn-sm" onclick="giveSalaryModal(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', ${worker.salary}, '${worker.next_payment}')" title="Pay Salary"><i class="bi bi-wallet2 me-1"></i>Salary</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="confirmDeleteWorker(${worker.id}, '${worker.name.replace(/'/g, "\\'")}', '${worker.code}', '${worker.position.replace(/'/g, "\\'")}')" title="Delete Worker"><i class="bi bi-trash me-1"></i>Delete</button>
             </div></td>
@@ -1027,7 +1027,323 @@ window.processAdvance = async function() {
     }
 };
 
-// LOAN (DOUYOUN) FUNCTIONS
+// LOAN OPTIONS (NEW LOAN OR PAY EXISTING LOANS)
+
+window.showLoanOptions = function(workerId, workerName, workerSalary) {
+    console.log('Showing loan options for:', workerId, workerName, workerSalary);
+    
+    // Create a modal with two options
+    const modalHtml = `
+        <div class="modal fade" id="loanOptionsModal" tabindex="-1" aria-labelledby="loanOptionsModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="loanOptionsModalLabel">
+                            <i class="bi bi-credit-card me-2"></i>Loan Options for ${workerName}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted mb-4">Choose what type of loan operation you want to perform:</p>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="card h-100 border-danger">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-plus-circle fs-1 text-danger mb-3"></i>
+                                        <h5 class="card-title">New Loan</h5>
+                                        <p class="card-text text-muted">Give a new loan to worker (independent from salary)</p>
+                                        <button class="btn btn-danger" onclick="giveLoanModal(${workerId}, '${workerName.replace(/'/g, "\\'")}', ${workerSalary}); closeLoanOptions()">
+                                            <i class="bi bi-plus-circle me-1"></i>Give New Loan
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card h-100 border-success">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-arrow-down-circle fs-1 text-success mb-3"></i>
+                                        <h5 class="card-title">Loan Payment</h5>
+                                        <p class="card-text text-muted">Make payment towards existing loans</p>
+                                        <button class="btn btn-success" onclick="showLoanPaymentModal(${workerId}, '${workerName.replace(/'/g, "\\'")}'); closeLoanOptions()">
+                                            <i class="bi bi-arrow-down-circle me-1"></i>Pay Loans
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('loanOptionsModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to DOM
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('loanOptionsModal'));
+    modal.show();
+};
+
+window.closeLoanOptions = function() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('loanOptionsModal'));
+    if (modal) {
+        modal.hide();
+    }
+};
+
+// LOAN PAYMENT FUNCTIONS
+
+window.showLoanPaymentModal = async function(workerId, workerName) {
+    console.log('Showing loan payment modal for:', workerId, workerName);
+    
+    try {
+        // Fetch worker's loans
+        const allLoans = await apiCall('/loans');
+        const workerLoans = allLoans.filter(loan => loan.worker_id === workerId && !loan.is_fully_paid);
+        
+        if (workerLoans.length === 0) {
+            showAlert(`${workerName} has no outstanding loans to pay.`, 'info');
+            return;
+        }
+        
+        // Create loan payment modal
+        const modalHtml = `
+            <div class="modal fade" id="loanPaymentModal" tabindex="-1" aria-labelledby="loanPaymentModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="loanPaymentModalLabel">
+                                <i class="bi bi-credit-card me-2"></i>Pay Loan for ${workerName}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="loanPaymentForm" novalidate>
+                                <input type="hidden" id="paymentWorkerId" value="${workerId}">
+                                <input type="hidden" id="paymentWorkerName" value="${workerName}">
+                                
+                                <div class="mb-3">
+                                    <label for="paymentLoanSelect" class="form-label">
+                                        <i class="bi bi-list me-1"></i>Select Loan to Pay
+                                    </label>
+                                    <select class="form-select" id="paymentLoanSelect" required>
+                                        <option value="">Choose a loan...</option>
+                                        ${workerLoans.map(loan => `
+                                            <option value="${loan.id}" data-remaining="${loan.remaining_balance}">
+                                                Loan #${loan.id} - ${formatCurrency(loan.remaining_balance)} remaining 
+                                                (Total: ${formatCurrency(loan.total_amount)})
+                                            </option>
+                                        `).join('')}
+                                    </select>
+                                    <div class="form-text">Select which loan you want to make a payment towards</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="paymentAmount" class="form-label">
+                                        <i class="bi bi-currency-dollar me-1"></i>Payment Amount (DA) <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0" required placeholder="Enter payment amount">
+                                    <div class="invalid-feedback">Please provide a valid payment amount.</div>
+                                    <div class="form-text" id="paymentAmountHelp">Maximum payment will be shown when you select a loan</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="paymentNotes" class="form-label">
+                                        <i class="bi bi-chat-left-text me-1"></i>Payment Notes
+                                    </label>
+                                    <textarea class="form-control" id="paymentNotes" rows="3" placeholder="Optional notes about this payment"></textarea>
+                                    <div class="form-text">Add any notes about this payment (optional)</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="paymentPin" class="form-label">
+                                        <i class="bi bi-shield-lock me-1"></i>Admin PIN <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="password" class="form-control" id="paymentPin" maxlength="4" required placeholder="Enter 4-digit PIN">
+                                    <div class="invalid-feedback">Admin PIN is required to process loan payment.</div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-success" onclick="processLoanPayment()">
+                                <i class="bi bi-check-circle me-1"></i>Process Payment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('loanPaymentModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Add modal to DOM
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Add event listener for loan selection
+        document.getElementById('paymentLoanSelect').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const remainingBalance = selectedOption.getAttribute('data-remaining');
+            const helpText = document.getElementById('paymentAmountHelp');
+            
+            if (remainingBalance) {
+                helpText.textContent = `Maximum payment: ${formatCurrency(parseFloat(remainingBalance))}`;
+                helpText.className = 'form-text text-info';
+            } else {
+                helpText.textContent = 'Maximum payment will be shown when you select a loan';
+                helpText.className = 'form-text';
+            }
+        });
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('loanPaymentModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Error loading loan payment modal:', error);
+        showAlert('Failed to load loan information. Please try again.', 'danger');
+    }
+};
+
+window.processLoanPayment = async function() {
+    console.log('Processing loan payment...');
+    
+    try {
+        const form = document.getElementById('loanPaymentForm');
+        const workerId = document.getElementById('paymentWorkerId').value;
+        const workerName = document.getElementById('paymentWorkerName').value;
+        const loanId = document.getElementById('paymentLoanSelect').value;
+        const amount = parseFloat(document.getElementById('paymentAmount').value);
+        const notes = document.getElementById('paymentNotes').value.trim();
+        const adminPin = document.getElementById('paymentPin').value.trim();
+        
+        // Clear previous validation states
+        form.querySelectorAll('.form-control').forEach(input => {
+            input.classList.remove('is-valid', 'is-invalid');
+        });
+        
+        // Validation
+        let isValid = true;
+        
+        // Validate loan selection
+        if (!loanId) {
+            document.getElementById('paymentLoanSelect').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('paymentLoanSelect').classList.add('is-valid');
+        }
+        
+        // Validate payment amount
+        if (!amount || amount <= 0) {
+            document.getElementById('paymentAmount').classList.add('is-invalid');
+            showAlert('❌ Please enter a valid payment amount.', 'error');
+            isValid = false;
+        } else {
+            // Check if amount doesn't exceed remaining balance
+            const selectedOption = document.getElementById('paymentLoanSelect').options[document.getElementById('paymentLoanSelect').selectedIndex];
+            const remainingBalance = parseFloat(selectedOption.getAttribute('data-remaining'));
+            
+            if (amount > remainingBalance) {
+                document.getElementById('paymentAmount').classList.add('is-invalid');
+                showAlert(`❌ Payment amount (${formatCurrency(amount)}) cannot exceed remaining balance (${formatCurrency(remainingBalance)}).`, 'error');
+                isValid = false;
+            } else {
+                document.getElementById('paymentAmount').classList.add('is-valid');
+            }
+        }
+        
+        // Validate admin PIN
+        if (!adminPin || adminPin.length !== 4 || !/^\d{4}$/.test(adminPin)) {
+            document.getElementById('paymentPin').classList.add('is-invalid');
+            isValid = false;
+        } else {
+            document.getElementById('paymentPin').classList.add('is-valid');
+        }
+        
+        // Mark notes as valid (optional field)
+        document.getElementById('paymentNotes').classList.add('is-valid');
+        
+        if (!isValid) {
+            return;
+        }
+        
+        // Show loading state
+        const processBtn = document.querySelector('#loanPaymentModal .btn-success');
+        const originalText = processBtn.innerHTML;
+        processBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+        processBtn.disabled = true;
+        
+        // Prepare payment data
+        const paymentData = {
+            payment_amount: amount,
+            notes: notes || null,
+            admin_pin: adminPin
+        };
+        
+        // Send payment request
+        const response = await fetch(`${API_BASE_URL}/loans/${loanId}/payment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(paymentData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Success - mark all fields as valid
+            form.querySelectorAll('.form-control').forEach(input => {
+                input.classList.remove('is-invalid');
+                input.classList.add('is-valid');
+            });
+            
+            showAlert(`✅ Payment of ${formatCurrency(amount)} processed successfully for ${workerName}!`, 'success');
+            
+            // Close modal after a short delay
+            setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('loanPaymentModal'));
+                modal.hide();
+                
+                // Refresh workers table to show updated data
+                loadWorkersTable();
+            }, 1500);
+            
+        } else {
+            // Error from server
+            showAlert(`❌ Error processing payment: ${result.error || 'Unknown error'}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error processing loan payment:', error);
+        showAlert('❌ Error processing payment. Please check your connection and try again.', 'error');
+    } finally {
+        // Restore button state
+        const processBtn = document.querySelector('#loanPaymentModal .btn-success');
+        if (processBtn) {
+            processBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Process Payment';
+            processBtn.disabled = false;
+        }
+    }
+};
+
+// NEW LOAN CREATION FUNCTIONS (DOUYOUN)
 
 window.giveLoanModal = function(workerId, workerName, workerSalary) {
     console.log('Opening loan modal for:', workerId, workerName, workerSalary);
@@ -1568,8 +1884,24 @@ async function fetchWorkerAdvances(workerId) {
 async function fetchWorkerLoans(workerId) {
     try {
         const allLoans = await apiCall('/loans');
-        return allLoans.filter(loan => loan.worker_id === workerId)
-                      .sort((a, b) => new Date(b.date_given) - new Date(a.date_given));
+        const workerLoans = allLoans.filter(loan => loan.worker_id === workerId)
+                                  .sort((a, b) => new Date(b.date_given) - new Date(a.date_given));
+        
+        // Fetch payments for each loan
+        for (let loan of workerLoans) {
+            try {
+                const paymentResponse = await apiCall(`/loans/${loan.id}/payments`);
+                // The backend returns { loan: {...}, payments: [...] }
+                loan.payments = paymentResponse.payments || [];
+                // Sort payments chronologically (oldest first) for better payment history view
+                loan.payments.sort((a, b) => new Date(a.payment_date) - new Date(b.payment_date));
+            } catch (error) {
+                console.error(`Error fetching payments for loan ${loan.id}:`, error);
+                loan.payments = [];
+            }
+        }
+        
+        return workerLoans;
     } catch (error) {
         console.error('Error fetching worker loans:', error);
         return [];
@@ -1583,7 +1915,7 @@ function displayWorkerProfile(worker, advances, loans) {
     const totalAdvances = advances.reduce((sum, advance) => sum + advance.amount, 0);
     const unpaidAdvances = advances.filter(a => !a.is_paid_back).reduce((sum, a) => sum + a.amount, 0);
     const totalLoans = loans.reduce((sum, loan) => sum + loan.total_amount, 0);
-    const unpaidLoans = loans.filter(l => !l.is_fully_paid).reduce((sum, l) => sum + (l.total_amount - (l.paid_amount || 0)), 0);
+    const unpaidLoans = loans.filter(l => !l.is_fully_paid).reduce((sum, l) => sum + (l.remaining_balance || 0), 0);
     
     profileContent.innerHTML = `
         <!-- Worker Info Section -->
@@ -1742,38 +2074,94 @@ function generateLoansTable(loans) {
 
     return `
         <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Total Amount</th>
-                        <th>Paid Amount</th>
-                        <th>Remaining</th>
-                        <th>Reason</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${loans.map(loan => {
-                        const paidAmount = loan.paid_amount || 0;
-                        const remaining = loan.total_amount - paidAmount;
-                        return `
-                            <tr>
-                                <td>${formatDate(loan.date_given)}</td>
-                                <td><strong>${formatCurrency(loan.total_amount)}</strong></td>
-                                <td>${formatCurrency(paidAmount)}</td>
-                                <td>${formatCurrency(remaining)}</td>
-                                <td>${loan.reason || '-'}</td>
-                                <td>
+            ${loans.map(loan => {
+                const paidAmount = loan.amount_paid_back || 0;
+                const remaining = loan.remaining_balance || 0;
+                const payments = loan.payments || [];
+                
+                return `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-credit-card me-2"></i>Loan #${loan.id} 
+                                        <small class="text-muted">(${formatDate(loan.date_given)})</small>
+                                    </h6>
+                                </div>
+                                <div class="col-auto">
                                     <span class="badge ${loan.is_fully_paid ? 'bg-success' : 'bg-danger'}">
                                         ${loan.is_fully_paid ? 'Fully Paid' : 'Outstanding'}
                                     </span>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Loan Summary -->
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <small class="text-muted">Total Amount</small>
+                                    <div class="fw-bold text-danger">${formatCurrency(loan.total_amount)}</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <small class="text-muted">Paid Amount</small>
+                                    <div class="fw-bold text-success">${formatCurrency(paidAmount)}</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <small class="text-muted">Remaining</small>
+                                    <div class="fw-bold ${remaining > 0 ? 'text-warning' : 'text-success'}">${formatCurrency(remaining)}</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <small class="text-muted">Reason</small>
+                                    <div class="fw-bold">${loan.reason || '-'}</div>
+                                </div>
+                            </div>
+                            
+                            ${payments.length > 0 ? `
+                                <!-- Payment History -->
+                                <h6 class="mb-2">
+                                    <i class="bi bi-clock-history me-1"></i>Payment History (${payments.length} payments)
+                                </h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Amount</th>
+                                                <th>Notes</th>
+                                                <th>Remaining After</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${payments.map((payment, index) => {
+                                                // Calculate remaining balance after this payment
+                                                // Since payments are now sorted chronologically (oldest first), we can calculate directly
+                                                const totalPaidUpToThisPoint = payments.slice(0, index + 1).reduce((sum, p) => sum + p.payment_amount, 0);
+                                                const remainingAfterPayment = loan.total_amount - totalPaidUpToThisPoint;
+                                                
+                                                return `
+                                                    <tr>
+                                                        <td>${formatDate(payment.payment_date)}</td>
+                                                        <td class="text-success fw-bold">${formatCurrency(payment.payment_amount)}</td>
+                                                        <td>${payment.notes || '-'}</td>
+                                                        <td class="${remainingAfterPayment > 0 ? 'text-warning' : 'text-success'} fw-bold">
+                                                            ${formatCurrency(Math.max(0, remainingAfterPayment))}
+                                                        </td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ` : `
+                                <div class="text-center text-muted py-2">
+                                    <i class="bi bi-info-circle me-1"></i>No payments made yet
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('')}
         </div>
     `;
 }
@@ -1793,17 +2181,17 @@ function setupProfileActionButtons(worker) {
         setTimeout(() => editWorker(worker.id), 300);
     };
     
-    // Give Advance button
+    // Give Advance button (Massarif)
     document.getElementById('giveAdvanceFromProfile').onclick = function() {
         const modal = bootstrap.Modal.getInstance(document.getElementById('workerProfileModal'));
         modal.hide();
         setTimeout(() => giveAdvanceModal(worker.id, worker.name, worker.salary), 300);
     };
     
-    // Give Loan button
+    // Loan Options button (New Loan or Pay Existing)
     document.getElementById('giveLoanFromProfile').onclick = function() {
         const modal = bootstrap.Modal.getInstance(document.getElementById('workerProfileModal'));
         modal.hide();
-        setTimeout(() => giveLoanModal(worker.id, worker.name, worker.salary), 300);
+        setTimeout(() => showLoanOptions(worker.id, worker.name, worker.salary), 300);
     };
 }
