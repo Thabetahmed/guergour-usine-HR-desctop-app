@@ -664,6 +664,7 @@ def create_app():
         total_loans_this_month = 0
         total_advances_this_month = 0
         total_paid_to_workers_this_month = 0
+        total_loans_given = 0  # All time total loans
 
         # Get all advances and loans for this month
         advances_this_month = Advance.query.filter(
@@ -674,8 +675,14 @@ def create_app():
             extract('year', Loan.date_given) == current_year,
             extract('month', Loan.date_given) == current_month
         ).all()
+        
+        # Calculate totals
         total_advances_this_month = sum(a.amount for a in advances_this_month)
         total_loans_this_month = sum(l.total_amount for l in loans_this_month)
+        
+        # Calculate all-time total loans
+        all_loans = Loan.query.all()
+        total_loans_given = sum(l.total_amount for l in all_loans)
 
         for worker in workers:
             # Get current monthly cycle based on hire date
@@ -727,9 +734,29 @@ def create_app():
                 # If next_payment is in the next month (relative to today)
                 if np.year == next_month.year and np.month == next_month.month:
                     is_paid_this_month = True
-            # The amount paid is salary - advances for this month (like khadama salary button)
+            
+            # Calculate actual payment amount according to new logic
             if is_paid_this_month:
-                amount_paid = max(0, earned_salary - advances_this_worker_month)
+                # Check if this is the hire month (don't count salary if hired this month)
+                hire_month = worker.hire_date.month
+                hire_year = worker.hire_date.year
+                
+                if current_month == hire_month and current_year == hire_year:
+                    # Hire month - don't count salary payment, only advances
+                    amount_paid = 0
+                else:
+                    # Not hire month - calculate actual payment
+                    # Get all advances since previous payment day (not just this month)
+                    # This is the actual amount company paid on payment day
+                    prev_payment_date = np - relativedelta(months=1)
+                    advances_since_last_payment = Advance.query.filter(
+                        Advance.worker_id == worker.id,
+                        Advance.date_given >= prev_payment_date,
+                        Advance.date_given < np
+                    ).all()
+                    total_advances_since_last_payment = sum(a.amount for a in advances_since_last_payment)
+                    amount_paid = max(0, earned_salary - total_advances_since_last_payment)
+                
                 total_paid_to_workers_this_month += amount_paid
 
             worker_summary = {
@@ -773,7 +800,8 @@ def create_app():
                 # New fields:
                 'total_loans_this_month': round(total_loans_this_month, 2),
                 'total_advances_this_month': round(total_advances_this_month, 2),
-                'total_paid_to_workers_this_month': round(total_paid_to_workers_this_month, 2)
+                'total_paid_to_workers_this_month': round(total_paid_to_workers_this_month, 2),
+                'total_loans_given': round(total_loans_given, 2)  # All time total loans
             },
             'system_info': {
                 'required_hours_per_month': 160,

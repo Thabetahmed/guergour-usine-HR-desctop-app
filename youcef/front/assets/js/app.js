@@ -293,18 +293,26 @@ function updateDashboardMetrics(workers, payrollData) {
             totalPayrollEl.textContent = formatCurrency(payrollData.totals.total_earned_payroll);
         }
 
-        // Total Advances
+        // Total Advances This Month
         const totalAdvancesEl = document.getElementById('totalAdvances');
         if (totalAdvancesEl) {
-            totalAdvancesEl.textContent = formatCurrency(payrollData.totals.total_advances_given);
+            totalAdvancesEl.textContent = formatCurrency(payrollData.totals.total_advances_this_month);
         }
 
-        // Final Payments (NEW LOGIC: sum of loans this month + advances this month + amount paid to workers this month)
+        // Total Spent This Month (Total company expenditure this month)
+        // = Advances given this month + Loans given this month + Actual salary payments made this month
+        // (Salary payments exclude hire month and are calculated as salary minus all advances since last payment)
         const finalPaymentsEl = document.getElementById('totalFinalPayments');
         if (finalPaymentsEl) {
             const t = payrollData.totals;
-            const finalPayments = (t.total_loans_this_month || 0) + (t.total_advances_this_month || 0) + (t.total_paid_to_workers_this_month || 0);
+            const finalPayments = (t.total_advances_this_month || 0) + (t.total_loans_this_month || 0) + (t.total_paid_to_workers_this_month || 0);
             finalPaymentsEl.textContent = formatCurrency(finalPayments);
+        }
+
+        // Total Loans Given (All Time)
+        const totalLoansGivenEl = document.getElementById('totalLoansGiven');
+        if (totalLoansGivenEl) {
+            totalLoansGivenEl.textContent = formatCurrency(payrollData.totals.total_loans_given);
         }
     }
 }
@@ -1194,7 +1202,17 @@ window.giveSalaryModal = async function(workerId, workerName, workerSalary, next
         let advances = [];
         try {
             const allAdvances = await apiCall('/advances');
-            advances = allAdvances.filter(a => a.worker_id === workerId && a.date_given && (new Date(a.date_given)).getFullYear() === today.getFullYear() && (new Date(a.date_given)).getMonth() === today.getMonth());
+            // Calculate previous payment date (exactly one month before next_payment)
+            const previousPaymentDate = new Date(nextPayment);
+            previousPaymentDate.setMonth(previousPaymentDate.getMonth() - 1);
+            
+            // Filter advances since previous payment date (not just current month)
+            advances = allAdvances.filter(a => {
+                if (a.worker_id !== workerId || !a.date_given) return false;
+                const advanceDate = new Date(a.date_given);
+                // Include advances from previous payment date up to today
+                return advanceDate >= previousPaymentDate && advanceDate <= today;
+            });
         } catch (e) {
             showAlert('Failed to fetch advances for this worker.', 'danger');
             return;
